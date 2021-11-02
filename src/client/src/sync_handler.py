@@ -1,12 +1,14 @@
 import os
 import traceback
 import logging
-import pysftp
+import paramiko
+from threading import Thread
 
 
 class SyncHandler:
     def __init__(self, config):
         self.config = config
+        self.client = paramiko.SSHClient()
         self.last_sync = self.load_last_sync_time()
         self.files_src = self.load_files_src_folder()
 
@@ -81,22 +83,63 @@ class SyncHandler:
         self.load_files_src_folder()
         if len(self.files_src) <= 0:
             return
-        with pysftp.Connection(self.config.host, username=self.config.username, password=self.config.password, log=False) as sftp:
-            logging.info("Connection succesfully stablished ... ")
-            if not sftp.exists(self.config.dest_folder):
-                sftp.mkdir(self.config.dest_folder)
+
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.client.connect(self.config.host,
+                            username=self.config.username, password=self.config.password)
+
+        # Setup sftp connection and transmit this script
+        sftp = self.client.open_sftp()
+
+        logging.info("Connection succesfully stablished ... ")
+        try:
             sftp.chdir(self.config.dest_folder)
-            for file in self.files_src:
-                src_path = os.path.join(self.config.src_folder, file)
-                dest_dirs = file.split('/')[0:-1]
-                dest_dirs_path = ""
-                for dest_dir in dest_dirs:
-                    dest_dirs_path = os.path.join(dest_dirs_path, dest_dir)
-                    if not sftp.exists(dest_dirs_path):
-                        sftp.mkdir(dest_dirs_path)
-                        logging.info(
-                            f"Created directory '{dest_dirs_path}'")
-                sftp.put(src_path, file)
+        except IOError:
+            sftp.mkdir(self.config.dest_folder)
+            logging.info(
+                f"Created directory '{self.config.dest_folder}'")
+        sftp.chdir(self.config.dest_folder)
+        for file in self.files_src:
+            src_path = os.path.join(self.config.src_folder, file)
+            dest_dirs = file.split('/')[0:-1]
+            for dest_dir in dest_dirs:
+                try:
+                    sftp.chdir(dest_dir)
+                except IOError:
+                    sftp.mkdir(dest_dir)
+                    sftp.chdir(dest_dir)
+                    logging.info(
+                        f"Created directory '{dest_dir}'")
+            sftp.chdir(self.config.dest_folder)
+            sftp.put(src_path, file)
+
+        sftp.close()
+
+    def execute(self):
+        stdin, stdout, stderr = self.client.exec_command(
+            f'pkill python')
+
+        def print_std(std):
+            for line in std:
+                print(line)
+        Thread(target=print_std, args=(stdout,)).start()
+
+        print_std(stderr)
+        stdin, stdout, stderr = self.client.exec_command(
+            f'python3 {self.config.path_execute}')
+
+        def print_std(std):
+            for line in std:
+                print(line)
+        Thread(target=print_std, args=(stdout,)).start()
+
+        print_std(stderr)
+
+        self.client.close()
+
+    def close(self):
+        self.client.exec_command('pkill python')
+        self.client.close()
 
     def print_sync_files(self):
         print("Synced: ", end="\n\t")

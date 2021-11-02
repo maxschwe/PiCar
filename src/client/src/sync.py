@@ -12,6 +12,9 @@ else:
     logging.basicConfig(level=config.logging_level,
                         format='%(levelname)s: %(message)s')
 
-sync_handler = SyncHandler(config)
-sync_handler.sync()
-sync_handler.print_sync_files()
+try:
+    sync_handler = SyncHandler(config)
+    sync_handler.sync()
+    sync_handler.print_sync_files()
+except KeyboardInterrupt:
+    sync_handler.close()
