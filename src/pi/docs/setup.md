@@ -5,3 +5,5 @@
 - cd /home/pi/PiCar
 - pip install requirements.txt except opencv-python
 - sudo apt-get install python3-opencv
+
+- sudo apt-get install nodejs npm

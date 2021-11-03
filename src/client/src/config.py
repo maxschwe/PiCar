@@ -6,10 +6,11 @@ class Config:
     src_folder = "/home/max/Schreibtisch/Python/PiCar/src/pi"
     dest_folder = "/home/pi/PiCar"
 
-    path_execute = "/home/pi/PiCar/src/api/run_api.py"
+    path_api = "/home/pi/PiCar/src/api/run_api.py"
+    path_webapp = "/home/pi/PiCar/src/webapp"
 
     # * = subdirs allowed, ** = name must be part of path
-    excluded_dirs = ["docs", "*__pycache__"]
+    excluded_dirs = ["docs", "*__pycache__", "*node_modules"]
     excluded_files = []
 
     filename_last_sync = ".last_sync"
@@ -20,7 +21,7 @@ class Config:
     filepath_last_sync = os.path.join(src_folder, filename_last_sync)
 
     # sync all independent from modified time
-    sync_all = True
+    sync_all = False
 
     host = "192.168.178.75"
     username = "pi"

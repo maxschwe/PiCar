@@ -27,12 +27,14 @@ class SyncHandler:
     def load_files_src_folder(self):
         files_sync = []
         for root, _, files in os.walk(self.config.src_folder):
-            for file in files:
-                file_path = os.path.join(root, file)
-                if self.config.sync_all or os.path.getmtime(file_path) >= self.last_sync or self.last_sync == 0:
-                    relative_filepath = file_path[len(self.config.src_folder):]
-                    relative_filepath = relative_filepath.lstrip("/")
-                    files_sync.append(relative_filepath)
+            if "src/webapp/node_modules" not in root:
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if self.config.sync_all or os.path.getmtime(file_path) >= self.last_sync or self.last_sync == 0:
+                        relative_filepath = file_path[len(
+                            self.config.src_folder):]
+                        relative_filepath = relative_filepath.lstrip("/")
+                        files_sync.append(relative_filepath)
         self.filter_files_sync(files_sync)
         return files_sync
 
@@ -126,7 +128,7 @@ class SyncHandler:
 
         print_std(stderr)
         stdin, stdout, stderr = self.client.exec_command(
-            f'python3 {self.config.path_execute}')
+            f'python3 {self.config.path_api}')
 
         def print_std(std):
             for line in std:
