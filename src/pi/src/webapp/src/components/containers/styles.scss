@@ -1,0 +1,116 @@
+$main_col: #252422;
+$main_col2: #403d39;
+$sec_col: #fffcf2;
+$sec_col2: #ccc5b9;
+$mark_col: #f85312;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: $main_col;
+  display: flex;
+  margin: 0px;
+  height: 100vh;
+}
+
+h1 {
+  color: $mark_col;
+  text-align: center;
+  text-decoration: underline;
+  font-weight: bold;
+  margin: 5px;
+}
+
+h3 {
+  color: $main_col;
+  text-align: center;
+  margin: 4px;
+}
+
+h4 {
+  color: $sec_col;
+  text-align: right;
+  margin-top: 0px;
+  margin-right: 25px;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+#container {
+  background-color: $main_col2;
+  flex-grow: 1;
+  border-radius: 25px;
+  margin: 10px 10vw;
+  padding: 10px;
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.wrapper-widget {
+  width: 100%;
+  display: flex;
+}
+
+.widget {
+  margin: 10px;
+  flex-grow: 1;
+  border-radius: 12px;
+  background-color: $sec_col2;
+  padding: 10px;
+}
+
+#livestream {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#livestream-img-container {
+  display: flex;
+  justify-content: center;
+}
+
+#livestream-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+#footer {
+  padding: 10px;
+}
+
+#copyright-text {
+  color: $sec_col2;
+  float: right;
+  margin-right: 5px;
+}
+
+#github {
+  color: $sec_col;
+  float: right;
+  margin-right: 20px;
+}
+
+@media only screen and (min-width: 768px) {
+  .wrapper-widget {
+    width: 50%;
+    height: 50%;
+    min-height: 200px;
+  }
+  #livestream-img-container {
+    position: relative;
+    flex-grow: 1;
+  }
+  #livestream-img {
+    position: absolute;
+  }
+}
