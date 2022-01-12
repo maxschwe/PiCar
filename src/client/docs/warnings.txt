@@ -1,1 +1,0 @@
-For now it always kills all python processes before running execution script
