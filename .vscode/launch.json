@@ -5,30 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Sync Run",
+      "name": "Python: Pi",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/src/client/src/sync_run.py",
+      "program": "${workspaceFolder}/src/pi/main.py",
       "console": "integratedTerminal"
     },
     {
-      "name": "Python: Sync",
+      "name": "Python: Client",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/src/client/src/sync.py",
+      "program": "${workspaceFolder}/src/client/main.py",
       "console": "integratedTerminal"
-    },
-    {
-      "name": "Python: Flask",
-      "type": "python",
-      "request": "launch",
-      "module": "flask",
-      "env": {
-        "FLASK_APP": "src/pi/src/api/run_api.py",
-        "FLASK_ENV": "development"
-      },
-      "args": ["run", "--no-debugger"],
-      "jinja": true
     }
   ]
 }
