@@ -2,6 +2,7 @@ import logging
 
 from .blueprint import Blueprint
 from .. import ACTION
+from .. import RETURN
 
 server = Blueprint()
 
@@ -13,4 +14,4 @@ def hi(arg, ret_type):
 
 @server.on(ACTION.ECHO)
 def echo(msg, socket):
-    socket.send(action=ACTION.ACK, msg=msg)
+    socket.send(action=ACTION.ECHO, ret_type=RETURN.ACK, msg=msg)

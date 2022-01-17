@@ -22,6 +22,12 @@ class TcpHandler(Thread):
                 msg = self.recv_msg(msg_length)
             else:
                 msg = ''
+            if msg_length > 15:
+                logging.info(
+                    f"-----Received: {action} - {msg[:15]}...({msg_length} Bytes)")
+            else:
+                logging.info(
+                    f"-----Received: {action} - {msg[:15]}({msg_length} Bytes)")
             self.handle_action(action, msg, ret_type)
 
     def send(self, action, ret_type=RETURN.NONE, msg=""):
@@ -39,8 +45,9 @@ class TcpHandler(Thread):
         sent = self.socket.send(header)
         if sent == 0:
             raise RuntimeError("Socket connection broken")
-        logging.info(
-            f"Sent {action}, {msg[:10]}...({msg_length} Bytes), {ret_type} to {self.addr}")
+        if config.LOG_HEADER:
+            logging.info(
+                f"Sent {action}, {msg_length} Bytes, {ret_type} to {self.addr}")
 
         # send msg if exists
         if msg_length > 0:
@@ -51,7 +58,7 @@ class TcpHandler(Thread):
                 sent = self.socket.send(msg_part)
                 if sent == 0:
                     raise RuntimeError("Socket connection broken")
-            logging.info(f"Sent message ({msg_length} Bytes)")
+        logging.info(f"Sent: {action}-{msg[:15]}...({msg_length} Bytes)")
         if ret_type == RETURN.ACK:
             return self.received_ack()
         else:
@@ -65,8 +72,6 @@ class TcpHandler(Thread):
         action = ACTION.decode(header[0])
         msg_length = int.from_bytes(header[1:7], byteorder='big')
         ret_type = RETURN.decode(header[7])
-        logging.info(
-            f"Received header: {action}, {msg_length}, {ret_type}")
         return action, msg_length, ret_type
 
     def recv_msg(self, msg_length):
@@ -75,7 +80,6 @@ class TcpHandler(Thread):
             recv_text = ""
             recv_text += self.socket.recv(recv_length).decode(config.ENCODING)
             msg_length -= config.MSG_LENGTH
-        logging.info(f"Received: {recv_text}")
         return recv_text
 
     def handle_action(self, action, msg, ret_type):
@@ -117,6 +121,10 @@ class TcpHandler(Thread):
         # send ack if expected
         if ret_type == RETURN.ACK:
             self.send_ack()
+
+    def received_ack(self):
+        action, _, _ = self.recv_header()
+        return action == ACTION.ACK
 
     def send_ack(self):
         self.send(ACTION.ACK, ret_type=RETURN.NONE)

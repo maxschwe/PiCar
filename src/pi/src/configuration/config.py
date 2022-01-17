@@ -4,7 +4,7 @@ import logging
 
 class Config:
     SERVER = ""
-    PORT = 5011
+    PORT = 5005
     ADDR = (SERVER, PORT)
 
     LOG_DIR = "logging"
@@ -13,6 +13,7 @@ class Config:
     LOG_FILE_MODE = "w"
     LOG_FILE = False
     LOG_FORMAT = '%(asctime)s: %(message)s'
+    LOG_HEADER = False
 
     ENCODING = "utf-8"
     MSG_LENGTH = 1024
