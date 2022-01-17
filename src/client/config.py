@@ -4,7 +4,7 @@ import logging
 
 class Config:
     SERVER = ""
-    PORT = 7777
+    PORT = 5011
     ADDR = (SERVER, PORT)
 
     LOG_DIR = "logging"

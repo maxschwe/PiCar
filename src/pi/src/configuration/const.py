@@ -1,12 +1,15 @@
 from enum import Enum
 
-# possible Actions
+# possible ACTION
+# Max types is 2^8=256 (One Byte)
 
 
-class ACTIONS(Enum):
+class ACTION(Enum):
     PING = 0
     ACK = 1
     DISCONNECT = 2
+    HI = 3
+    ECHO = 4
 
     @classmethod
     def decode(cls, code):

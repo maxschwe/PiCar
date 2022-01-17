@@ -1,10 +1,7 @@
 import logging
 import os
 
-from tcp_server import TcpServer
-from config import Config
-
-config = Config()
+from src import get_server, config
 
 
 def setup_logging():
@@ -17,5 +14,5 @@ def setup_logging():
 
 
 setup_logging()
-server = TcpServer()
+server = get_server()
 server.run()
