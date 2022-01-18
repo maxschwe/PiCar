@@ -14,12 +14,12 @@ class TcpServer:
 
     def register_blueprint(self, blueprint):
         self.action_map.update(blueprint.get_action_map())
-        logging.info(f"Updated action map: {self.action_map}")
+        logging.info(f"[Updated action map: {self.action_map}]")
 
     def run(self):
         self.socket.bind(config.ADDR)
         self.socket.listen()
-        logging.info(f"Server is listening on port {config.PORT}")
+        logging.info(f"[Server is listening on port {config.PORT}]")
         self.handlers = []
         while self.running:
             conn, addr = self.socket.accept()

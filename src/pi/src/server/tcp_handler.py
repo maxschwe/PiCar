@@ -16,21 +16,14 @@ class TcpHandler(Thread):
 
     def run(self):
         while self.connected:
-            action, msg_length, ret_type = self.recv_header()
-            # recv msg if available
-            if msg_length > 0:
-                msg = self.recv_msg(msg_length)
-            else:
-                msg = ''
-            if msg_length > 15:
-                logging.info(
-                    f"-----Received: {action} - {msg[:15]}...({msg_length} Bytes)")
-            else:
-                logging.info(
-                    f"-----Received: {action} - {msg[:15]}({msg_length} Bytes)")
-            self.handle_action(action, msg, ret_type)
+            # accept request
+            action, msg, ret_type = self.receive()
 
-    def send(self, action, ret_type=RETURN.NONE, msg=""):
+            # handle request
+            self.handle_action(action, msg, ret_type)
+            self.log(type="div")
+
+    def send(self, action, msg="", ret_type=RETURN.NONE):
         # calculate msg length
         msg_length = len(msg)
 
@@ -58,11 +51,25 @@ class TcpHandler(Thread):
                 sent = self.socket.send(msg_part)
                 if sent == 0:
                     raise RuntimeError("Socket connection broken")
-        logging.info(f"Sent: {action}-{msg[:15]}...({msg_length} Bytes)")
+        self.log(
+            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
+
+        # wait for ack if expected
         if ret_type == RETURN.ACK:
             return self.received_ack()
         else:
             return True
+
+    def receive(self):
+        action, msg_length, ret_type = self.recv_header()
+        # recv msg if available
+        if msg_length > 0:
+            msg = self.recv_msg(msg_length)
+        else:
+            msg = ''
+        self.log(
+            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="recv")
+        return action, msg, ret_type
 
     def recv_header(self):
         header = self.socket.recv(8)
@@ -75,11 +82,11 @@ class TcpHandler(Thread):
         return action, msg_length, ret_type
 
     def recv_msg(self, msg_length):
+        recv_text = ""
         while msg_length > 0:
-            recv_length = max(msg_length, config.MSG_LENGTH)
-            recv_text = ""
+            recv_length = min(msg_length, config.MSG_LENGTH)
             recv_text += self.socket.recv(recv_length).decode(config.ENCODING)
-            msg_length -= config.MSG_LENGTH
+            msg_length -= recv_length
         return recv_text
 
     def handle_action(self, action, msg, ret_type):
@@ -89,8 +96,10 @@ class TcpHandler(Thread):
                 self.send_ack()
             self.connected = False
             self.socket.close()
-            logging.info(f"Client {self.addr} disconnected!")
+            self.log(f"Client {self.addr} disconnected!", type="server")
             return
+        elif action == ACTION.PING:
+            pass
         elif action in self.action_map:
             func = self.action_map[action]
             var_names = func.__code__.co_varnames
@@ -117,6 +126,8 @@ class TcpHandler(Thread):
                 logging.error(
                     "Definition of Mapping function should have these kwargs: ['msg', 'ret_type', 'socket']. (Incorrect kwargs only supported for 1-2 parameters)")
             func(*args, **kwargs)
+        else:
+            logging.error(f"{action} is not mapped")
 
         # send ack if expected
         if ret_type == RETURN.ACK:
@@ -124,7 +135,24 @@ class TcpHandler(Thread):
 
     def received_ack(self):
         action, _, _ = self.recv_header()
-        return action == ACTION.ACK
+        if action == ACTION.ACK:
+            self.log(ACTION.ACK, type="recv")
+            return True
+        return False
 
     def send_ack(self):
         self.send(ACTION.ACK, ret_type=RETURN.NONE)
+
+    def log(self, msg="", type="txt"):
+        if type == "txt":
+            logging.info(f">>> {msg}")
+        elif type == "recv":
+            logging.info(f"~ Recv: {msg}")
+        elif type == "sent":
+            logging.info(f"Sent: {msg}")
+        elif type == "div":
+            logging.info(60*"-")
+        elif type == "server":
+            logging.info(f"[{msg}]")
+        else:
+            logging.error("Wrong type log")

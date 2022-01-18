@@ -18,15 +18,16 @@ class TcpClient:
 
     def run(self):
         self.socket.connect(config.ADDR)
-        logging.info(f"Connected to {config.SERVER}:{config.PORT}")
+        self.log(f"Connected to {config.SERVER}:{config.PORT}", type="server")
+        self.log(type="div")
         self.ping()
         self.exec(ACTION.HI)
-        self.exec(ACTION.ECHO, ret_type=RETURN.TEXT, msg="hallo")
+        self.exec(ACTION.ECHO, msg="Max"*15000, ret_type=RETURN.TEXT)
         self.disconnect()
         while self.connected:
             pass
 
-    def send(self, action=ACTION.PING, ret_type=RETURN.ACK, msg=""):
+    def send(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK):
         # calculate msg length
         msg_length = len(msg)
 
@@ -51,34 +52,31 @@ class TcpClient:
                 sent = self.socket.send(msg_part)
                 if sent == 0:
                     raise RuntimeError("Socket connection broken")
-        if msg_length > 15:
-            logging.info(f"Sent: {action} - {msg[:15]}...({msg_length} Bytes)")
-        else:
-            logging.info(f"Sent: {action} - {msg[:15]}({msg_length} Bytes)")
+        self.log(
+            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
 
     def exec(self, action=ACTION.PING, ret_type=RETURN.ACK, msg=""):
         self.send(action=action, ret_type=ret_type, msg=msg)
         if ret_type == RETURN.ACK:
             if self.received_ack():
                 return True
-            else:
-                logging.error(f"Did not receive {ACTION.ACK}")
-                return False
+            logging.error(f"Did not receive {ACTION.ACK}")
+            return False
         else:
-            action, msg_length, ret_type = self.recv_header()
-            if msg_length > 0:
-                msg = self.recv_msg(msg_length)
-            else:
-                msg = ""
-            if msg_length > 15:
-                logging.info(
-                    f"-----Received: {action} - {msg[:15]}...({msg_length} Bytes)")
-            else:
-                logging.info(
-                    f"-----Received: {action} - {msg[:15]}({msg_length} Bytes)")
-            if ret_type == RETURN.ACK:
-                self.send(ACTION.ACK, ret_type=RETURN.NONE)
-            return msg
+            return self.receive()
+
+    def receive(self):
+        action, msg_length, ret_type = self.recv_header()
+        if msg_length > 0:
+            msg = self.recv_msg(msg_length)
+        else:
+            msg = ""
+        self.log(
+            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="recv")
+        if ret_type == RETURN.ACK:
+            self.send_ack()
+        self.log(type="div")
+        return msg
 
     def recv_header(self):
         header = self.socket.recv(8)
@@ -91,16 +89,20 @@ class TcpClient:
         return action, msg_length, ret_type
 
     def recv_msg(self, msg_length):
+        recv_text = ""
         while msg_length > 0:
-            recv_length = max(msg_length, config.MSG_LENGTH)
-            recv_text = ""
+            recv_length = min(msg_length, config.MSG_LENGTH)
             recv_text += self.socket.recv(recv_length).decode(config.ENCODING)
-            msg_length -= config.MSG_LENGTH
+            msg_length -= recv_length
         return recv_text
 
     def received_ack(self):
         action, _, _ = self.recv_header()
-        return action == ACTION.ACK
+        if action == ACTION.ACK:
+            self.log(ACTION.ACK, type="recv")
+            self.log(type="div")
+            return True
+        return False
 
     def ping(self):
         start = time.time()
@@ -109,7 +111,8 @@ class TcpClient:
             raise RuntimeError(
                 "Socket connection broken or server wrong configured")
         ping_time = time.time() - start
-        logging.info(f"----------Ping: {ping_time:2f}s")
+        self.log(f"Ping: {ping_time:2f}s")
+        self.log(type="div")
         return ping_time
 
     def disconnect(self):
@@ -118,4 +121,21 @@ class TcpClient:
             raise RuntimeError("Error when disconnecting")
         self.connected = False
         self.socket.close()
-        logging.info("You have disconnected successfully!")
+        self.log("You have disconnected successfully!", type="server")
+
+    def send_ack(self):
+        self.send(ACTION.ACK, ret_type=RETURN.NONE)
+
+    def log(self, msg="", type="txt"):
+        if type == "txt":
+            logging.info(f">>> {msg}")
+        elif type == "recv":
+            logging.info(f"~ Recv: {msg}")
+        elif type == "sent":
+            logging.info(f"Sent: {msg}")
+        elif type == "server":
+            logging.info(f"[{msg}]")
+        elif type == "div":
+            logging.info(60*"-")
+        else:
+            logging.error("Wrong type log")
