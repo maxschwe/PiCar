@@ -2,30 +2,31 @@ import socket
 import logging
 import time
 import math
+import traceback
 
-from config import Config
-from const import *
-
-
-config = Config()
+from .. import config, ACTION, RETURN
 
 
 class TcpClient:
     def __init__(self):
-        self.connected = True
+        self.connected = False
 
+    def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    def run(self):
-        self.socket.connect(config.ADDR)
-        self.log(f"Connected to {config.SERVER}:{config.PORT}", type="server")
+        for port in config.PORT:
+            try:
+                self.socket.connect((config.SERVER, port))
+                self.connected = True
+                break
+            except:
+                pass
+        if not self.connected:
+            logging.error("Failed to connect to server")
+            return False
+        self.log(f"Connected to {config.SERVER}:{port}", type="server")
         self.log(type="div")
         self.ping()
-        self.exec(ACTION.HI)
-        self.exec(ACTION.ECHO, msg="Max"*15000, ret_type=RETURN.TEXT)
-        self.disconnect()
-        while self.connected:
-            pass
+        return True
 
     def send(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK):
         # calculate msg length
@@ -45,7 +46,10 @@ class TcpClient:
 
         # send msg if exists
         if msg_length > 0:
-            msg_encoded = msg.encode(encoding=config.ENCODING)
+            if type(msg) != bytes:
+                msg_encoded = msg.encode(encoding=config.ENCODING)
+            else:
+                msg_encoded = msg
             for i in range(math.ceil(msg_length/config.MSG_LENGTH)):
                 msg_part = msg_encoded[i *
                                        config.MSG_LENGTH:(i+1)*config.MSG_LENGTH]
@@ -55,15 +59,14 @@ class TcpClient:
         self.log(
             f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
 
-    def exec(self, action=ACTION.PING, ret_type=RETURN.ACK, msg=""):
-        self.send(action=action, ret_type=ret_type, msg=msg)
-        if ret_type == RETURN.ACK:
-            if self.received_ack():
-                return True
-            logging.error(f"Did not receive {ACTION.ACK}")
-            return False
-        else:
+    def exec(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK):
+        self.send(action=action, msg=msg, ret_type=ret_type)
+        if ret_type != RETURN.ACK:
             return self.receive()
+        if self.received_ack():
+            return True
+        logging.error(f"Did not receive {ACTION.ACK}")
+        return False
 
     def receive(self):
         action, msg_length, ret_type = self.recv_header()
@@ -115,6 +118,15 @@ class TcpClient:
         self.log(type="div")
         return ping_time
 
+    def put(self, filepath, new_filepath):
+        with open(filepath, "rb") as f:
+            file_txt = f.read()
+
+        msg = f"{new_filepath}|".encode(config.ENCODING) + file_txt
+        success = self.exec(action=ACTION.PUT, msg=msg)
+        if not success:
+            logging.error(f"Error when syncing: {filepath} to {new_filepath}")
+
     def disconnect(self):
         ack = self.exec(action=ACTION.DISCONNECT, ret_type=RETURN.ACK)
         if not ack:
@@ -122,6 +134,22 @@ class TcpClient:
         self.connected = False
         self.socket.close()
         self.log("You have disconnected successfully!", type="server")
+
+    def exec_restart(self):
+        ack = self.exec(action=ACTION.RESTART, ret_type=RETURN.ACK)
+        if not ack:
+            raise RuntimeError("Error when restarting")
+        self.connected = False
+        self.socket.close()
+        self.log("You have disconnected successfully!", type="server")
+        time.sleep(config.DELAY_RECONNECTING)
+        start_time = time.time()
+        while (time.time() - start_time) < config.TIMEOUT_RECONNECTING:
+            if self.connect():
+                break
+            time.sleep(config.DELAY_RETRY_CONNECTING)
+        if not self.connected:
+            logging.error("Failed to reconnect after restarting server")
 
     def send_ack(self):
         self.send(ACTION.ACK, ret_type=RETURN.NONE)

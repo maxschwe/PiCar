@@ -5,12 +5,12 @@ class Blueprint:
     def __init__(self):
         self.action_map = {}
 
-    def on(self, action):
+    def on(self, action, **kwargs):
         def handle_action(func):
             if action in self.action_map:
                 logging.warning(
                     f"Overriding previously added function map for {action}")
-            self.action_map[action] = func
+            self.action_map[action] = [func, kwargs]
 
             def wrap_func(*args, **kwargs):
                 return func(*args, **kwargs)

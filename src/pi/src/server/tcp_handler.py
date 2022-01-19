@@ -2,8 +2,7 @@ import logging
 from threading import Thread
 import math
 
-from .. import config
-from .. import ACTION, RETURN
+from .. import config, ACTION, RETURN
 
 
 class TcpHandler(Thread):
@@ -64,7 +63,7 @@ class TcpHandler(Thread):
         action, msg_length, ret_type = self.recv_header()
         # recv msg if available
         if msg_length > 0:
-            msg = self.recv_msg(msg_length)
+            msg = self.recv_msg(msg_length, action)
         else:
             msg = ''
         self.log(
@@ -81,27 +80,36 @@ class TcpHandler(Thread):
         ret_type = RETURN.decode(header[7])
         return action, msg_length, ret_type
 
-    def recv_msg(self, msg_length):
-        recv_text = ""
+    def recv_msg(self, msg_length, action):
+        kwargs = self.action_map[action][1]
+        no_decoding = "no_decoding" in kwargs and kwargs["no_decoding"]
+        if no_decoding:
+            recv_text = b""
+        else:
+            recv_text = ""
         while msg_length > 0:
             recv_length = min(msg_length, config.MSG_LENGTH)
-            recv_text += self.socket.recv(recv_length).decode(config.ENCODING)
+
+            if no_decoding:
+                recv_text += self.socket.recv(recv_length)
+            else:
+                recv_text += self.socket.recv(
+                    recv_length).decode(config.ENCODING)
             msg_length -= recv_length
         return recv_text
 
     def handle_action(self, action, msg, ret_type):
         if action == ACTION.DISCONNECT:
-            # send ack and disconnect
-            if ret_type == RETURN.ACK:
-                self.send_ack()
-            self.connected = False
-            self.socket.close()
-            self.log(f"Client {self.addr} disconnected!", type="server")
+            self.disconnect(ret_type)
             return
+        elif action == ACTION.RESTART:
+            self.disconnect(ret_type)
+            self.action_map[action][0]()
+
         elif action == ACTION.PING:
             pass
         elif action in self.action_map:
-            func = self.action_map[action]
+            func = self.action_map[action][0]
             var_names = func.__code__.co_varnames
             args = []
             kwargs = {}
@@ -156,3 +164,11 @@ class TcpHandler(Thread):
             logging.info(f"[{msg}]")
         else:
             logging.error("Wrong type log")
+
+    def disconnect(self, ret_type):
+        # send ack and disconnect
+        if ret_type == RETURN.ACK:
+            self.send_ack()
+        self.connected = False
+        self.socket.close()
+        self.log(f"Client {self.addr} disconnected!", type="server")

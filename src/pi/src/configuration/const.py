@@ -10,6 +10,8 @@ class ACTION(Enum):
     DISCONNECT = 2
     HI = 3
     ECHO = 4
+    PUT = 5
+    RESTART = 6
 
     @classmethod
     def decode(cls, code):

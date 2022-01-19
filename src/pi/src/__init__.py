@@ -1,4 +1,5 @@
-from .configuration import Config, ACTION, RETURN
+from .configuration import ACTION, RETURN
+from .configuration import Config
 
 if True:
     config = Config()

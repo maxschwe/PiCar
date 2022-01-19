@@ -1,10 +1,9 @@
 import logging
 import os
+import time
+from tkinter import *
 
-from tcp_client import TcpClient
-from config import Config
-
-config = Config()
+from src import TcpClient, sync_dir, config, ACTION, RETURN
 
 
 def setup_logging():
@@ -17,5 +16,11 @@ def setup_logging():
 
 
 setup_logging()
+
 client = TcpClient()
-client.run()
+client.connect()
+client.exec(ACTION.HI)
+
+sync_dir(client, all=False)
+client.exec_restart()
+client.disconnect()
