@@ -10,7 +10,7 @@ class Slider(LabelFrame):
         self.from_ = from_
         self.to = to
 
-        self.initial_val = initial_val
+        self.initial_val = self.last_val = initial_val
         self.label = ""
         self.val = IntVar(value=initial_val)
         self.entry_val = IntVar(value=initial_val)
@@ -52,6 +52,8 @@ class Slider(LabelFrame):
             self.btn_reset.pack(side=LEFT, expand=True, pady=(10, 5))
             self.slider.pack(side=RIGHT, padx=10)
 
+        self.on_change(self.initial_val)
+
     def validate_int(self, *_):
         if self.entry.get() == "":
             self.entry.state(["invalid"])
@@ -78,11 +80,17 @@ class Slider(LabelFrame):
         if self.validate_int():
             new_val = int(self.entry_val.get())
             self.val.set(new_val)
+            self.on_change(new_val)
 
     def on_change(self, val):
         val = int(float(val))
         self.val.set(val)
-        self.exec(self.action, val)
+        self.entry_val.set(val)
+
+        # send if value changed
+        if self.last_val != val:
+            self.last_val = val
+            self.exec(action=self.action, msg=val)
 
     def reset(self):
         self.val.set(self.initial_val)

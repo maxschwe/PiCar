@@ -33,9 +33,13 @@ class TcpClient:
         msg_length = len(msg)
 
         # encode header
-        action_encoded = action.value.to_bytes(1, byteorder="big")
+        if type(action) != int:
+            action = action.value
+        action_encoded = action.to_bytes(1, byteorder="big")
         msg_length_encoded = msg_length.to_bytes(6, byteorder="big")
-        ret_type_encoded = ret_type.value.to_bytes(1, byteorder="big")
+        if type(ret_type) != int:
+            ret_type = ret_type.value
+        ret_type_encoded = ret_type.to_bytes(1, byteorder="big")
 
         header = action_encoded + msg_length_encoded + ret_type_encoded
 
@@ -57,7 +61,7 @@ class TcpClient:
                 if sent == 0:
                     raise RuntimeError("Socket connection broken")
         self.log(
-            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
+            f"{ACTION.decode(action)} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
 
     def exec(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK):
         self.send(action=action, msg=msg, ret_type=ret_type)

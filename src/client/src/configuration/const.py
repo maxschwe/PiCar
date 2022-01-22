@@ -22,6 +22,10 @@ class ACTION(Enum):
     def decode(cls, code):
         return cls(code)
 
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c, cls))
+
 # possible Return Types
 
 
@@ -38,3 +42,7 @@ class RETURN(Enum):
     @classmethod
     def decode(cls, code):
         return cls(code)
+
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c, cls))
