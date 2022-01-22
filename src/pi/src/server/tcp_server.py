@@ -2,6 +2,7 @@ import socket
 import logging
 import os
 import sys
+import time
 
 from .tcp_handler import TcpHandler
 from .. import config, ACTION
@@ -42,6 +43,9 @@ class TcpServer:
     def restart(self):
         self.socket.close()
         self.socket.detach()
+        from ..routes.default import camera
+        camera.vs.stop()
+        time.sleep(0.5)
         logging.info("[Server is shutting down and will be restarted]")
         print(5 * (100*"_" + "\n"))
-        os.execv(sys.executable, ['python'] + sys.argv)
+        os.execv(sys.executable, ['python3'] + sys.argv)

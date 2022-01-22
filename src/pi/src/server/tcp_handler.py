@@ -4,6 +4,8 @@ import math
 
 from .. import config, ACTION, RETURN
 
+# hello
+
 
 class TcpHandler(Thread):
     def __init__(self, socket, addr, action_map, *args, **kwargs):
@@ -20,9 +22,10 @@ class TcpHandler(Thread):
 
             # handle request
             self.handle_action(action, msg, ret_type)
-            self.log(type="div")
 
-    def send(self, action, msg="", ret_type=RETURN.NONE):
+            # self.log(type="div")
+
+    def send(self, action, msg="", ret_type=RETURN.NONE, log=False):
         # calculate msg length
         msg_length = len(msg)
 
@@ -43,15 +46,19 @@ class TcpHandler(Thread):
 
         # send msg if exists
         if msg_length > 0:
-            msg_encoded = msg.encode(encoding=config.ENCODING)
+            if type(msg) != bytes:
+                msg_encoded = msg.encode(encoding=config.ENCODING)
+            else:
+                msg_encoded = msg
             for i in range(math.ceil(msg_length/config.MSG_LENGTH)):
                 msg_part = msg_encoded[i *
                                        config.MSG_LENGTH:(i+1)*config.MSG_LENGTH]
                 sent = self.socket.send(msg_part)
                 if sent == 0:
                     raise RuntimeError("Socket connection broken")
-        self.log(
-            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
+        if log:
+            self.log(
+                f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
 
         # wait for ack if expected
         if ret_type == RETURN.ACK:
@@ -59,15 +66,16 @@ class TcpHandler(Thread):
         else:
             return True
 
-    def receive(self):
+    def receive(self, log=False):
         action, msg_length, ret_type = self.recv_header()
         # recv msg if available
         if msg_length > 0:
             msg = self.recv_msg(msg_length, action)
         else:
             msg = ''
-        self.log(
-            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="recv")
+        if log:
+            self.log(
+                f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="recv")
         return action, msg, ret_type
 
     def recv_header(self):
@@ -83,19 +91,14 @@ class TcpHandler(Thread):
     def recv_msg(self, msg_length, action):
         kwargs = self.action_map[action][1]
         no_decoding = "no_decoding" in kwargs and kwargs["no_decoding"]
-        if no_decoding:
-            recv_text = b""
-        else:
-            recv_text = ""
+        recv_text = b""
         while msg_length > 0:
             recv_length = min(msg_length, config.MSG_LENGTH)
-
-            if no_decoding:
-                recv_text += self.socket.recv(recv_length)
-            else:
-                recv_text += self.socket.recv(
-                    recv_length).decode(config.ENCODING)
-            msg_length -= recv_length
+            new_txt = self.socket.recv(recv_length)
+            recv_text += new_txt
+            msg_length -= len(new_txt)
+        if not no_decoding:
+            recv_text = recv_text.decode(config.ENCODING)
         return recv_text
 
     def handle_action(self, action, msg, ret_type):
@@ -120,9 +123,9 @@ class TcpHandler(Thread):
             if "socket" in var_names:
                 kwargs["socket"] = self
             # 1 unknown args -> take msg
-            if len(var_names) == 1 and not kwargs:
+            if len(var_names) == 2 and len(kwargs) < 1:
                 args.append(msg)
-            elif len(var_names) == 2 and len(kwargs) < 2:
+            elif len(var_names) == 3 and len(kwargs) < 2:
                 # 2 unknown args -> take msg, ret_type
                 if not kwargs:
                     args.append(msg, ret_type)
@@ -130,7 +133,7 @@ class TcpHandler(Thread):
                     args.append(ret_type)
                 else:
                     args.append(msg)
-            elif len(var_names) == 3 and len(kwargs) < 3:
+            elif len(var_names) == 4 and len(kwargs) < 3:
                 logging.error(
                     "Definition of Mapping function should have these kwargs: ['msg', 'ret_type', 'socket']. (Incorrect kwargs only supported for 1-2 parameters)")
             func(*args, **kwargs)
@@ -155,7 +158,7 @@ class TcpHandler(Thread):
         if type == "txt":
             logging.info(f">>> {msg}")
         elif type == "recv":
-            logging.info(f"~ Recv: {msg}")
+            logging.info(f"- Recv: {msg}")
         elif type == "sent":
             logging.info(f"Sent: {msg}")
         elif type == "div":

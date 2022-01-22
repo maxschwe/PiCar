@@ -28,9 +28,15 @@ class TcpClient:
         self.ping()
         return True
 
-    def send(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK):
+    def send(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK, log=False):
         # calculate msg length
-        msg_length = len(msg)
+        if type(msg) != bytes:
+            msg = str(msg)
+            msg_encoded = msg.encode(encoding=config.ENCODING)
+        else:
+            msg_encoded = msg
+
+        msg_length = len(msg_encoded)
 
         # encode header
         if type(action) != int:
@@ -50,39 +56,37 @@ class TcpClient:
 
         # send msg if exists
         if msg_length > 0:
-            if type(msg) != bytes:
-                msg_encoded = msg.encode(encoding=config.ENCODING)
-            else:
-                msg_encoded = msg
+
             for i in range(math.ceil(msg_length/config.MSG_LENGTH)):
                 msg_part = msg_encoded[i *
                                        config.MSG_LENGTH:(i+1)*config.MSG_LENGTH]
                 sent = self.socket.send(msg_part)
                 if sent == 0:
                     raise RuntimeError("Socket connection broken")
-        self.log(
-            f"{ACTION.decode(action)} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
+        if log:
+            self.log(
+                f"{ACTION.decode(action)} - {msg[:60]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
 
-    def exec(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK):
-        self.send(action=action, msg=msg, ret_type=ret_type)
+    def exec(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK, decode=True, log=False):
+        self.send(action=action, msg=msg, ret_type=ret_type, log=log)
         if ret_type != RETURN.ACK:
-            return self.receive()
+            return self.receive(decode=decode, log=log)
         if self.received_ack():
             return True
         logging.error(f"Did not receive {ACTION.ACK}")
         return False
 
-    def receive(self):
+    def receive(self, decode=True, log=False):
         action, msg_length, ret_type = self.recv_header()
-        if msg_length > 0:
-            msg = self.recv_msg(msg_length)
-        else:
-            msg = ""
-        self.log(
-            f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="recv")
+        msg = self.recv_msg(
+            msg_length, decode=decode) if msg_length > 0 else ""
+        if log:
+            self.log(
+                f"{action} - {msg[:15]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="recv")
         if ret_type == RETURN.ACK:
             self.send_ack()
-        self.log(type="div")
+        if log:
+            self.log(type="div")
         return msg
 
     def recv_header(self):
@@ -95,12 +99,16 @@ class TcpClient:
         ret_type = RETURN.decode(header[7])
         return action, msg_length, ret_type
 
-    def recv_msg(self, msg_length):
-        recv_text = ""
+    def recv_msg(self, msg_length, decode=True):
+        recv_text = b""
         while msg_length > 0:
             recv_length = min(msg_length, config.MSG_LENGTH)
-            recv_text += self.socket.recv(recv_length).decode(config.ENCODING)
-            msg_length -= recv_length
+            new_txt = self.socket.recv(recv_length)
+            recv_text += new_txt
+            msg_length -= len(new_txt)
+        if decode:
+            recv_text = recv_text.decode(config.ENCODING)
+
         return recv_text
 
     def received_ack(self):
@@ -130,6 +138,8 @@ class TcpClient:
         success = self.exec(action=ACTION.PUT, msg=msg)
         if not success:
             logging.error(f"Error when syncing: {filepath} to {new_filepath}")
+        else:
+            logging.info(f"Synced {filepath} to {new_filepath}")
 
     def disconnect(self):
         ack = self.exec(action=ACTION.DISCONNECT, ret_type=RETURN.ACK)

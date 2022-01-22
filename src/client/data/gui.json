@@ -7,23 +7,6 @@
         }
     },
     "config_btns": {
-        "test": {
-            "action": 0,
-            "msg": "kfjasl;fdkja",
-            "ret": 0,
-            "active": 1
-        },
-        "test2": {
-            "action": 0,
-            "msg": "aklsfdj",
-            "ret": 0,
-            "active": 1
-        },
-        "dfa": {
-            "action": 0,
-            "msg": "a",
-            "ret": 0,
-            "active": 0
-        }
+        
     }
 }

@@ -17,6 +17,7 @@ class ACTION(Enum):
     BACKWARD = 9
     SPEED = 10
     STEERING = 11
+    LIVESTREAM = 12
 
     @classmethod
     def decode(cls, code):
@@ -38,6 +39,7 @@ class RETURN(Enum):
     LIST = 5
     ACK = 6
     NONE = 7
+    JPG = 8
 
     @classmethod
     def decode(cls, code):

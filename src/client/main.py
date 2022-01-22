@@ -1,9 +1,9 @@
 import logging
 import os
 import time
-from tkinter import *
 
 from src import TcpClient, sync_dir, config, ACTION, RETURN
+from src import Window
 
 
 def setup_logging():
@@ -19,8 +19,16 @@ setup_logging()
 
 client = TcpClient()
 client.connect()
-client.exec(ACTION.HI)
+sync_dir(client, all=True)
+# client.exec_restart()
+win = Window(client)
 
-sync_dir(client, all=False)
-client.exec_restart()
+time_between = 1 / config.FPS
+print(time_between)
+while win.active:
+    start = time.time()
+    win.update_livestream()
+    win.update()
+    time.sleep(max(0, (time_between - (time.time() - start))))
+
 client.disconnect()

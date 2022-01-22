@@ -1,14 +1,18 @@
 import tkinter as tk
 from tkinter.constants import *
 from tkinter.ttk import *
+import numpy as np
+import cv2
 
 import json
 import traceback
+import time
 
 from .slider import Slider
 from .buttons import ActionButton, ConfigButton
 from .add_btn import add_btn
-from .. import ACTION
+from .. import ACTION, RETURN
+from ..client.sync import sync_dir
 
 ACTION_BTN = {"1m straight": ACTION.STRAIGHT,
               "turn 90": ACTION.TURN, "1m backwards": ACTION.BACKWARD, "2m straight": ACTION.STRAIGHT,
@@ -19,7 +23,7 @@ CONFIG_BTN = {"1m straight": [ACTION.STRAIGHT, True],
 
 
 class Window(tk.Tk):
-    def __init__(self, width=1200, height=700):
+    def __init__(self, client, width=1200, height=700):
         super().__init__()
         x = int(self.winfo_screenwidth()/2 - width/2)
         y = max(0, int(self.winfo_screenheight()/2 - height/2 - 40))
@@ -28,6 +32,9 @@ class Window(tk.Tk):
 
         self.tk.call("source", "src/gui/Sun-Valley-ttk-theme/sun-valley.tcl")
         self.tk.call("set_theme", "dark")
+
+        self.client = client
+        self.active = True
 
         self.load_data()
         self.widgets()
@@ -84,13 +91,14 @@ class Window(tk.Tk):
         self.bind("<Escape>", self.close)
 
     def execute(self, action, msg="", ret=None):
-        print(action, msg, ret)
+        msg = self.client.exec(action, msg, ret)
 
     def sync(self):
-        pass
+        sync_dir(self.client, all=True)
 
     def sync_restart(self):
-        pass
+        self.sync()
+        self.client.exec_restart()
 
     def load_data(self):
         try:
@@ -133,6 +141,13 @@ class Window(tk.Tk):
             self.fr_config_btn, text="+", style="Accent.TButton", command=self.config_add_clicked)
         self.config_add.grid(row=index // 2, column=index % 2, padx=3, pady=3)
 
+    def update_livestream(self):
+        msg = self.client.exec(
+            ACTION.LIVESTREAM, ret_type=RETURN.JPG, decode=False)
+        jpeg = np.frombuffer(msg, dtype=np.uint8)
+        frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
+        cv2.imshow('frame', frame)
+
     def action_add_clicked(self):
         name, data = add_btn(self, action_btn=True, new=True)
         self.action_btns[name] = data
@@ -146,4 +161,5 @@ class Window(tk.Tk):
         self.save_data()
 
     def close(self, *_):
+        self.active = False
         self.destroy()
