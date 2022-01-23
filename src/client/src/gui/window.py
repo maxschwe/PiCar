@@ -3,6 +3,7 @@ from tkinter.constants import *
 from tkinter.ttk import *
 import numpy as np
 import cv2
+from PIL import ImageTk, Image
 
 import json
 import traceback
@@ -39,6 +40,7 @@ class Window(tk.Tk):
         self.load_data()
         self.widgets()
         self.bind_keys()
+        self.update()
 
     def widgets(self):
         self.fr_btn = Frame(self)
@@ -83,6 +85,9 @@ class Window(tk.Tk):
         self.btn_sync_restart = Button(
             self.fr_sync_btn, text="Sync and Restart", command=self.sync_restart, style="Accent.TButton")
         self.btn_sync_restart.grid(row=0, column=1, sticky=EW, padx=5, pady=3)
+
+        self.livestream = Label(self.fr_info)
+        self.livestream.pack()
 
         self.update_action_btn()
         self.update_config_btn()
@@ -142,11 +147,20 @@ class Window(tk.Tk):
         self.config_add.grid(row=index // 2, column=index % 2, padx=3, pady=3)
 
     def update_livestream(self):
+        width = self.fr_info.winfo_width()
         msg = self.client.exec(
             ACTION.LIVESTREAM, ret_type=RETURN.JPG, decode=False)
         jpeg = np.frombuffer(msg, dtype=np.uint8)
         frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
-        cv2.imshow('frame', frame)
+        img = Image.fromarray(frame)
+        factor = width / img.width
+        print(width, img.width)
+        resized_img = img.resize(
+            (int(width), int(img.height * factor)), Image.ANTIALIAS)
+
+        imgtk = ImageTk.PhotoImage(image=resized_img)
+        self.livestream.imgtk = imgtk
+        self.livestream.configure(image=imgtk)
 
     def action_add_clicked(self):
         name, data = add_btn(self, action_btn=True, new=True)

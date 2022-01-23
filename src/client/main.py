@@ -24,7 +24,6 @@ sync_dir(client, all=True)
 win = Window(client)
 
 time_between = 1 / config.FPS
-print(time_between)
 while win.active:
     start = time.time()
     win.update_livestream()
