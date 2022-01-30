@@ -15,7 +15,7 @@ class Camera(object):
             return np.flip(frame, 0)
         return frame
 
-    def _get_frame(self):
+    def get_frame(self):
         frame = self._flip_if_needed(self.vs.read())
         _, jpeg = cv2.imencode('.jpg', frame)
         return jpeg.tobytes()

@@ -43,8 +43,9 @@ class TcpServer:
     def restart(self):
         self.socket.close()
         self.socket.detach()
-        from ..routes.default import camera
-        camera.vs.stop()
+        from ..robot import Robot
+        robot = Robot.instance()
+        robot.camera.vs.stop()
         time.sleep(0.5)
         logging.info("[Server is shutting down and will be restarted]")
         print(5 * (100*"_" + "\n"))

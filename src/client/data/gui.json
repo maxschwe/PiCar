@@ -4,9 +4,19 @@
             "action": 0,
             "msg": "",
             "ret": 6
+        },
+        "a": {
+            "action": 0,
+            "msg": "",
+            "ret": 0
         }
     },
     "config_btns": {
-        
+        "moinmoin": {
+            "action": 4,
+            "msg": "",
+            "ret": 0,
+            "active": 1
+        }
     }
 }

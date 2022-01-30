@@ -1,7 +1,9 @@
 import logging
 import os
+from threading import Thread
 
 from src import get_server, config
+from src.robot import Robot
 
 
 def setup_logging():
@@ -15,4 +17,8 @@ def setup_logging():
 
 setup_logging()
 server = get_server()
+
+robot = Robot.instance()
+Thread(target=robot.run, daemon=True).start()
+
 server.run()

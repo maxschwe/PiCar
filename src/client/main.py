@@ -19,8 +19,9 @@ setup_logging()
 
 client = TcpClient()
 client.connect()
-sync_dir(client, all=True)
-# client.exec_restart()
+synced_count = sync_dir(client, all=False)
+if synced_count > 0:
+    client.exec_restart()
 win = Window(client)
 
 time_between = 1 / config.FPS

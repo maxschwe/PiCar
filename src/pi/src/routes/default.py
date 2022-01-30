@@ -1,14 +1,10 @@
 import logging
 import os
-import cv2
 
 from .blueprint import Blueprint
 from .. import ACTION, RETURN, config
 
-from ..server.camera import Camera
-
 server = Blueprint()
-camera = Camera()
 
 
 @server.on(ACTION.HI)
@@ -31,9 +27,3 @@ def put(msg):
     logging.info(f"Created file: {path}")
     with open(path, "wb") as f:
         f.write(file_txt)
-
-
-@server.on(ACTION.LIVESTREAM)
-def livestream(socket):
-    frame = camera._get_frame()
-    socket.send(action=ACTION.LIVESTREAM, msg=frame)

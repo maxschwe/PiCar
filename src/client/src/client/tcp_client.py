@@ -13,6 +13,7 @@ class TcpClient:
 
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # self.socket.settimeout(2)
         for port in config.PORT:
             try:
                 self.socket.connect((config.SERVER, port))
@@ -67,7 +68,7 @@ class TcpClient:
             self.log(
                 f"{ACTION.decode(action)} - {msg[:60]}{'...' if msg_length > 15 else ''} ({msg_length} Bytes)", type="sent")
 
-    def exec(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK, decode=True, log=False):
+    def exec(self, action=ACTION.PING, msg="", ret_type=RETURN.ACK, decode=True, log=True):
         self.send(action=action, msg=msg, ret_type=ret_type, log=log)
         if ret_type != RETURN.ACK:
             return self.receive(decode=decode, log=log)
@@ -135,7 +136,7 @@ class TcpClient:
             file_txt = f.read()
 
         msg = f"{new_filepath}|".encode(config.ENCODING) + file_txt
-        success = self.exec(action=ACTION.PUT, msg=msg)
+        success = self.exec(action=ACTION.PUT, msg=msg, log=False)
         if not success:
             logging.error(f"Error when syncing: {filepath} to {new_filepath}")
         else:

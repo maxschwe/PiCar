@@ -12,12 +12,9 @@ class ACTION(Enum):
     ECHO = 4
     PUT = 5
     RESTART = 6
-    STRAIGHT = 7
-    TURN = 8
-    BACKWARD = 9
-    SPEED = 10
-    STEERING = 11
-    LIVESTREAM = 12
+    SPEED = 7
+    STEERING = 8
+    LIVESTREAM = 9
 
     @classmethod
     def decode(cls, code):
