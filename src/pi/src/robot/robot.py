@@ -1,4 +1,5 @@
 from .camera import Camera
+from .servo import Servo
 import RPi.GPIO as GPIO
 import time
 
@@ -13,16 +14,12 @@ en_right = 22
 
 servo = 5
 
-OUTPUTS = [in1_left, in2_left, en_left, in1_right, in2_right, en_right, 5]
+OUTPUTS = [in1_left, in2_left, en_left, in1_right, in2_right, en_right]
 
 MIN_SPEED = 20
-
 MAX_STEERING_ANGLE = 35
-SERVO_0 = 5
-SERVO_180 = 15
-servo_fac = 1 / 13
-SERVO_MIN = servo_fac * (90 - MAX_STEERING_ANGLE) + 0.5
-SERVO_MAX = servo_fac * (90 + MAX_STEERING_ANGLE) + 0.5
+SERVO_MIN = 90 - MAX_STEERING_ANGLE
+SERVO_MAX = 90 + MAX_STEERING_ANGLE
 
 
 class InstanceBuffer:
@@ -31,17 +28,18 @@ class InstanceBuffer:
 
 class Robot:
     def __init__(self):
-        self.mov_type = "Stop"
-        self.camera = Camera()
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
+        self.mov_type = "Stop"
+        self.camera = Camera()
+        self.servo = Servo(servo, init_pos=90)
+
         for out in OUTPUTS:
             GPIO.setup(out, GPIO.OUT)
             GPIO.output(out, GPIO.LOW)
 
         self.m_left = GPIO.PWM(en_left, 120)
         self.m_right = GPIO.PWM(en_right, 120)
-        self.servo = GPIO.PWM(servo, 50)
         self.set_speed(0)
         self.set_steering(0)
 
@@ -59,14 +57,13 @@ class Robot:
         print(f"Speed: {self.speed}")
 
     def set_steering(self, steering):
-        self.steering = round(self._map_between(
-            steering, -100, 100, SERVO_MIN, SERVO_MAX), 1)
-        print(self.steering)
+        self.steering = self._map_between(
+            steering, -100, 100, SERVO_MIN, SERVO_MAX)
+        self.servo.move(self.steering)
 
     def run(self):
         self.m_left.start(0)
         self.m_right.start(0)
-        self.servo.start(0)
         while True:
             if self.mov_type == "Stop":
                 GPIO.output(in1_left, GPIO.LOW)
@@ -85,8 +82,10 @@ class Robot:
                 GPIO.output(in2_right, GPIO.LOW)
             self.m_left.ChangeDutyCycle(self.speed)
             self.m_right.ChangeDutyCycle(self.speed)
-            self.servo.ChangeDutyCycle(self.steering)
             time.sleep(0.2)
+
+    def test(self):
+        self.servo.test()
 
     def _map_between(self, val, min_in, max_in, min_out, max_out):
         if not (min_in <= val <= max_in):
