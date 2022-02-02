@@ -1,8 +1,6 @@
 import logging
 import os
 
-from .blueprint import Blueprint
-from .. import ACTION, RETURN, config
 
 server = Blueprint()
 

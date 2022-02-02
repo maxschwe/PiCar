@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO
 import time
+from ..configuration.robot_config import SERVO_Y_INTERCEPT, SERVO_M
 
 
 class Servo:
@@ -11,7 +12,7 @@ class Servo:
         self.init(init_pos)
 
     def _conv_deg_duty(self, deg):
-        return 2.3 + deg / 20.8
+        return SERVO_Y_INTERCEPT + deg * SERVO_M
 
     def init(self, deg):
         self.out.start(0)

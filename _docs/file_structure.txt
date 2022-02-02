@@ -1,0 +1,44 @@
+client
+	gui
+		window
+		window_add_edit
+		buttons
+		slider
+		
+	tcp
+		tcp_client
+		sync_client
+		robot_client
+		actions
+	data
+		.last_sync
+		.gui.json
+	log
+
+	config.py
+	main.py
+	
+
+
+
+
+server
+	tcp
+		tcp_server
+		tcp_handler
+		tcp_sync
+		tcp_sync_handler
+		actions
+		blueprint
+	routes
+		--your routes --
+	
+	robot
+		...
+	
+	log
+
+	main.py
+	sync.py
+		
+		

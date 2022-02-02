@@ -1,8 +1,10 @@
 import logging
 import os
 
-from .blueprint import Blueprint
-from .. import ACTION, RETURN, config
+from ..tcp import config
+
+from ..tcp.blueprint import Blueprint
+from .. import ACTION, RETURN
 
 from ..robot import Robot
 
