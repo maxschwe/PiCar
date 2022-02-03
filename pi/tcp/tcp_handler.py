@@ -2,10 +2,15 @@ import logging
 from threading import Thread
 import math
 import json
+import traceback
+import time
+import os
 
 from .config import Config
 from .actions import ACTIONS
 
+
+# JSON, decode and more_to_recv are generated and dont need to be specified
 FLAGS = ["", "", "", "", "json", "decode", "ack", "more_to_recv"]
 DEFAULT_FLAG_VALUES = [False, False, False, False, False, True, False, False]
 
@@ -16,6 +21,13 @@ class TcpHandler(Thread):
         self.socket = socket
         self.addr = addr
         self.action_map = action_map
+        self.action_map["server-handler"] = {
+            ACTIONS.DISCONNECT: self.disconnect,
+            ACTIONS.PING: self.ping_response,
+            ACTIONS.PUT: self.put,
+            ACTIONS.ECHO: self.echo,
+            ACTIONS.HI: self.hi
+        }
         self.connected = True
 
     def run(self):
@@ -39,7 +51,8 @@ class TcpHandler(Thread):
                 msg = ''
             params.append(msg)
             more_to_recv = flags["more_to_recv"]
-
+        if len(params) == 1:
+            params = params[0]
         return action, params, flags
 
     def recv_header(self):
@@ -47,9 +60,9 @@ class TcpHandler(Thread):
         if header == b'':
             raise RuntimeError("Socket connection broken")
         # decode header
-        action = ACTIONS.decode(header[:2])
-        msg_length = int.from_bytes(header[1:7], byteorder='big')
-        val_flags = int.from_bytes(header[7], byteorder="big")
+        action = ACTIONS.decode(int.from_bytes(header[:2], byteorder='big'))
+        msg_length = int.from_bytes(header[2:7], byteorder='big')
+        val_flags = header[7]
         # convert val flags to single bits and then map to flag names
         flags = {flag_name: val == "1" for val, flag_name in zip(
             "{0:08b}".format(val_flags), FLAGS)}
@@ -76,14 +89,21 @@ class TcpHandler(Thread):
         return False
 
     def send(self, action, params="", **flags):
-        if type(params) == str:
+        if type(params) != list:
             params = [params]
         params_count = len(params)
         for i, msg in enumerate(params):
-            # calculate msg length
-            msg_length = len(msg)
             flags["more_to_recv"] = params_count - 1 != i
             flags["json"] = type(msg) == dict
+            flags["decode"] = type(msg) != bytes
+
+            # convert msg to string and convert to bytes
+            if type(msg) != bytes:
+                if flags["json"]:
+                    msg = json.dumps(msg)
+                msg = msg.encode(encoding=Config.ENCODING)
+            # calculate msg length
+            msg_length = len(msg)
 
             # send header
             sent_flags = self.send_header(action, msg_length, **flags)
@@ -120,13 +140,9 @@ class TcpHandler(Thread):
         sent = self.socket.send(header)
         if sent == 0:
             raise RuntimeError("Socket connection broken")
-        return flags
+        return dict(zip(FLAGS, flags))
 
     def send_msg(self, msg, msg_length, flags):
-        if type(msg) != bytes:
-            if flags["json"]:
-                msg = json.dumps(msg)
-            msg = msg.encode(encoding=Config.ENCODING)
         for i in range(math.ceil(msg_length/Config.MSG_LENGTH)):
             msg_part = msg[i * Config.MSG_LENGTH:
                            (i+1)*Config.MSG_LENGTH]
@@ -137,34 +153,42 @@ class TcpHandler(Thread):
     def send_ack(self):
         self.send(ACTIONS.ACK)
 
-    def handle_action(self, action, params, flags):
-        if action == ACTIONS.DISCONNECT:
-            self.disconnect()
-            return
-        elif action == ACTIONS.RESTART:
-            self.disconnect()
-            self.action_map[action][0]()
-            return
-        elif action == ACTIONS.PING:
-            self.send(ACTIONS.PING, ack=True)
-        elif action in self.action_map:
-            func = self.action_map[action][0]
-            var_names = func.__code__.co_varnames[:]
-            kwargs = {}
-            if "params" in var_names:
-                if len(params) < 2:
-                    params = params[0]
-                kwargs["params"] = params
-            if "flags" in var_names:
-                kwargs["flags"] = flags
-            if "socket" in var_names:
-                kwargs["socket"] = self
-
-            func(**kwargs)
+    def _find_action_map(self, action):
+        if action in self.action_map["server-global"]:
+            return self.action_map["server-global"][action], "server-global"
+        elif action in self.action_map["server-handler"]:
+            return self.action_map["server-handler"][action], "server-handler"
         else:
+            for file, maps in self.action_map["files"].items():
+                if action in maps:
+                    return maps[action], file
+        return None, None
+
+    def handle_action(self, action, params, flags):
+        func, search_path = self._find_action_map(action)
+        if func is None:
             error = f"{action} is not mapped"
-            logging.error()
+            logging.error(error)
             self.send(ACTIONS.ERROR, error)
+            return
+        if action in self.action_map:
+            func = self.action_map[action]
+        var_names = func.__code__.co_varnames[:]
+        kwargs = {}
+        if "params" in var_names:
+            kwargs["params"] = params
+        if "flags" in var_names:
+            kwargs["flags"] = flags
+        if "socket" in var_names:
+            kwargs["socket"] = self
+        try:
+            func(**kwargs)
+        except:
+            error = traceback.format_exc()
+            error_txt = f"{search_path}/{action}: {error}"
+            logging.error(error_txt)
+            self.send(ACTIONS.ERROR, error_txt)
+            return
 
         # send ack if expected and if not already other response
         if flags["ack"] and not self.sent_response:
@@ -174,15 +198,35 @@ class TcpHandler(Thread):
         if type == "txt":
             logging.info(f">>> {msg}")
         elif type == "recv":
-            logging.info(f"- Recv: {msg}")
+            logging.info(f"Rx: {msg}")
         elif type == "sent":
-            logging.info(f"Sent: {msg}")
+            logging.info(f"Tx: {msg}")
         elif type == "div":
-            logging.info(60*"-")
+            logging.info(50*"-")
         elif type == "server":
             logging.info(f"[{msg}]")
         else:
             logging.error("Wrong type log")
+
+    def ping_response(self):
+        start_time = time.time()
+        self.send(ACTIONS.PING, ack=True)
+        self.log(
+            f"Ping of {self.addr}: {time.time() - start_time:6f}s", type="server")
+
+    def echo(self, params):
+        self.send(action=ACTIONS.ECHO, params=params)
+
+    def hi(self):
+        self.log("Hello World")
+
+    def put(self, params):
+        file_path = params[0]
+        path_dir = "/".join(file_path.split("/")[:-1])
+        os.makedirs(path_dir, exist_ok=True)
+        with open(file_path, "wb") as f:
+            f.write(params[1])
+        logging.info(f"Created file: {file_path}")
 
     def disconnect(self):
         # send ack and disconnect

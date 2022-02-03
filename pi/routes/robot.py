@@ -1,30 +1,29 @@
 import logging
 import os
+import traceback
 
-from ..tcp import config
+from tcp import Blueprint, ACTIONS
 
-from ..tcp.blueprint import Blueprint
-from .. import ACTION, RETURN
+server = Blueprint(__file__)
+try:
+    from robot import Robot
+    robot = Robot.instance()
+except:
+    pass
+try:
+    @server.on(ACTIONS.LIVESTREAM)
+    def livestream(socket):
+        liveimg = robot.get_liveimg()
+        socket.send(action=ACTIONS.LIVESTREAM, msg=liveimg)
 
-from ..robot import Robot
+    @server.on(ACTIONS.SPEED)
+    def speed(params):
+        new_speed = int(params)
+        robot.set_speed(new_speed)
 
-server = Blueprint()
-robot = Robot.instance()
-
-
-@server.on(ACTION.LIVESTREAM)
-def livestream(socket):
-    liveimg = robot.get_liveimg()
-    socket.send(action=ACTION.LIVESTREAM, msg=liveimg)
-
-
-@server.on(ACTION.SPEED)
-def speed(msg):
-    new_speed = int(msg)
-    robot.set_speed(new_speed)
-
-
-@server.on(ACTION.STEERING)
-def steering(msg):
-    new_steering = int(msg)
-    robot.set_steering(new_steering)
+    @server.on(ACTIONS.STEERING)
+    def steering(params):
+        new_steering = int(params)
+        robot.set_steering(new_steering)
+except:
+    server.set_error(traceback.format_exc())

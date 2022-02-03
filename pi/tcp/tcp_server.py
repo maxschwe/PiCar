@@ -7,34 +7,40 @@ import traceback
 from .config import Config
 from .actions import ACTIONS
 from .tcp_handler import TcpHandler
+from routes import blueprints
 
 
 class TcpServer:
-    def __init__(self, port):
-        self.port = port
-        self.action_map = {ACTIONS.RESTART: [self.restart, {}]}
-
+    def __init__(self):
+        self.action_map = {
+            "server-global": {ACTIONS.RESTART: self.restart, ACTIONS.LOAD_STATUS: self.load_status},
+            "files": {blueprint.file_map: blueprint.get_action_map() for blueprint in blueprints}
+        }
+        print(self.action_map)
+        self.robot_error = None
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def register_blueprint(self, blueprint):
-        self.action_map.update(blueprint.get_action_map())
-
     def run(self):
-        try:
-            self.server.bind((Config.SERVER, self.port))
-            self.server.listen()
-        except:
-            logging.error(f"[Server could not be started on port {self.port}]")
-            logging.error(traceback.format_exc())
-            raise RuntimeError
+        self.running = False
+        for port in range(Config.PORT[0], Config.PORT[0] + Config.PORT[1]):
+            try:
+                self.server.bind((Config.SERVER, port))
+                self.server.listen()
+                self.running = True
+                self.port = port
+                break
+            except:
+                logging.warning(f"[Failed to start server on port {port}]")
 
-        self.running = True
+        if not self.running:
+            raise RuntimeError("Server could not get started!")
         logging.info(f"[Server is listening on port {self.port}]")
 
         self.handlers = []
         while self.running:
             conn, addr = self.server.accept()
             # Start handler for client
+            logging.info(f"[Client {addr} connected]")
             handler = TcpHandler(conn, addr, self.action_map, daemon=True)
             handler.start()
             self.handlers.append(handler)
@@ -44,10 +50,19 @@ class TcpServer:
         self.server.close()
         self.server.detach()
 
-    def restart(self):
+    def restart(self, socket):
+        socket.disconnect()
         self.stop_server()
         logging.info("[Server is shutting down and will be restarted]")
         print(5 * "...\n")
 
         # restart script
         os.execv(sys.executable, ['python3'] + sys.argv)
+
+    def set_robot_error(self, error):
+        self.robot_error = error
+
+    def load_status(self, socket):
+        data = {blueprint.file_map: blueprint.error for blueprint in blueprints}
+        data["robot"] = self.robot_error
+        socket.send(ACTIONS.LOAD_STATUS, params=data)

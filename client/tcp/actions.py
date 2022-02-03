@@ -4,7 +4,7 @@ from enum import Enum
 # Max types is 2^8=256 (One Byte)
 
 
-class ACTION(Enum):
+class ACTIONS(Enum):
     PING = 0
     ACK = 1
     DISCONNECT = 2
@@ -12,9 +12,11 @@ class ACTION(Enum):
     ECHO = 4
     PUT = 5
     RESTART = 6
-    SPEED = 7
-    STEERING = 8
-    LIVESTREAM = 9
+    ERROR = 7
+    SPEED = 8
+    STEERING = 9
+    LIVESTREAM = 10
+    LOAD_STATUS = 11
 
     @classmethod
     def decode(cls, code):

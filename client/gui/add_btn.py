@@ -2,7 +2,7 @@ from tkinter.ttk import *
 from tkinter import Toplevel
 from tkinter.constants import *
 
-from ..configuration.const import *
+from ..tcp import ACTIONS
 
 
 def add_btn(master, action_btn, new, **kwargs):
@@ -29,7 +29,7 @@ def add_btn(master, action_btn, new, **kwargs):
     lbl_action = Label(fr_config, text="Action:")
     lbl_action.grid(row=0, column=1, pady=5)
 
-    action = Combobox(fr_config, values=ACTION.list(), state="readonly")
+    action = Combobox(fr_config, values=ACTIONS.list(), state="readonly")
     action.grid(row=1, column=1, padx=10)
 
     lbl_msg = Label(fr_config, text="Message:")
@@ -41,7 +41,7 @@ def add_btn(master, action_btn, new, **kwargs):
     lbl_ret = Label(fr_config, text="Return Type:")
     lbl_ret.grid(row=0, column=3)
 
-    ret = Combobox(fr_config, values=RETURN.list(), state="readonly")
+    ret = Combobox(fr_config, values=ACTIONS.list(), state="readonly")
     ret.grid(row=1, column=3, padx=10)
 
     if not action_btn:
@@ -52,7 +52,7 @@ def add_btn(master, action_btn, new, **kwargs):
         active.grid(row=1, column=4, padx=10)
 
     if not new:
-        action.current(ACTION.list().index(kwargs["action"]))
+        action.current(ACTIONS.list().index(kwargs["action"]))
         msg.delete(0, "end")
         msg.insert(0, kwargs["msg"])
         ret.current(RETURN.list().index(kwargs["ret"]))

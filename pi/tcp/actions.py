@@ -1,6 +1,7 @@
 from enum import Enum
 
 
+# Max: 2^16 = 65.536
 class ACTIONS(Enum):
     PING = 0
     ACK = 1
@@ -9,9 +10,11 @@ class ACTIONS(Enum):
     ECHO = 4
     PUT = 5
     RESTART = 6
-    SPEED = 7
-    STEERING = 8
-    LIVESTREAM = 9
+    ERROR = 7
+    SPEED = 8
+    STEERING = 9
+    LIVESTREAM = 10
+    LOAD_STATUS = 11
 
     @classmethod
     def decode(cls, code):

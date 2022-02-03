@@ -1,9 +1,7 @@
-import logging
 import os
-import time
+import logging
 
-from tcp import TcpClient, sync_dir
-from gui import Window
+from tcp import TcpClient, ACTIONS, sync_dir
 from config import Config
 
 
@@ -20,10 +18,12 @@ setup_logging()
 
 client = TcpClient()
 client.connect()
-synced_count = sync_dir(client, all=False)
-if synced_count > 0:
-    client.exec_restart()
-win = Window(client)
 
+client.load_status()
+
+"""action, params = client.exec(
+        ACTIONS.ECHO, ["Hallo ich bin der Max", {"wie geht es dir": 20}], log=True)"""
+
+# sync_dir(client, all=True)
 
 client.disconnect()

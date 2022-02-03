@@ -7,7 +7,7 @@ class Config:
     # LOG configuration
     # ==================================================================
     LOG_DIR = "log"
-    LOG_TCP = os.path.join(LOG_DIR, "client.log")
+    LOG_SYNC = os.path.join(LOG_DIR, "tcp.log")
 
     LOG_LEVEL = logging.INFO
     LOG_FORMAT = '%(asctime)s: %(message)s'

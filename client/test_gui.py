@@ -1,4 +1,4 @@
-from src import Window
+from gui import Window
 
 win = Window()
 win.mainloop()

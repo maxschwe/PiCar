@@ -1,6 +1,6 @@
 from .camera import Camera
 from .servo import Servo
-from ..configuration.robot_config import *
+from .robot_config import Config
 import RPi.GPIO as GPIO
 import time
 
@@ -20,14 +20,14 @@ class Robot:
         GPIO.setwarnings(False)
         self.mov_type = "Stop"
         self.camera = Camera()
-        self.servo = Servo(servo, init_pos=90)
+        self.servo = Servo(Config.servo, init_pos=90)
 
-        for out in OUTPUTS:
+        for out in Config.OUTPUTS:
             GPIO.setup(out, GPIO.OUT)
             GPIO.output(out, GPIO.LOW)
 
-        self.m_left = GPIO.PWM(en_left, 120)
-        self.m_right = GPIO.PWM(en_right, 120)
+        self.m_left = GPIO.PWM(Config.en_left, 120)
+        self.m_right = GPIO.PWM(Config.en_right, 120)
         self.set_speed(0)
         self.set_steering(0)
 
@@ -41,9 +41,9 @@ class Robot:
         else:
             self.mov_type = 'Backward' if speed < 0 else 'Forward'
             self.speed = round(self._map_between(
-                abs(speed), 0, 100, MIN_SPEED, 100), 2)
+                abs(speed), 0, 100, Config.MIN_SPEED, 100), 2)
 
-        for pin, val in zip(MOTOR_CONTROL, MOTOR_CONTROL_VECTOR[self.mov_type]):
+        for pin, val in zip(Config.MOTOR_CONTROL, MOTOR_CONTROL_VECTOR[self.mov_type]):
             GPIO.out(pin, val)
 
         self.m_left.ChangeDutyCycle(self.speed)
@@ -51,7 +51,7 @@ class Robot:
 
     def set_steering(self, steering):
         self.steering = self._map_between(
-            steering, -100, 100, SERVO_MIN, SERVO_MAX)
+            steering, -100, 100, Config.SERVO_MIN, Config.SERVO_MAX)
         self.servo.move(self.steering)
 
     def run(self):

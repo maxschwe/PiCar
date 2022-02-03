@@ -13,13 +13,13 @@ import time
 from .slider import Slider
 from .buttons import ActionButton, ConfigButton
 from .add_btn import add_btn
-from .. import ACTION, RETURN
-from ..client.sync import sync_dir
+from ..tcp import sync_dir, ACTIONS
 
 
 class Window(tk.Tk):
-    def __init__(self, client, width=1000, height=600):
+    def __init__(self, client, width=1000, height=600, fps=30):
         super().__init__()
+        self.fps = fps
         x = int(self.winfo_screenwidth()/2 - width/2)
         y = max(0, int(self.winfo_screenheight()/2 - height/2 - 40))
         y = 0
@@ -50,10 +50,10 @@ class Window(tk.Tk):
         self.fr_driving = Frame(self.fr_btn)
         self.fr_driving.pack(fill=X, expand=True)
         self.slider_speed = Slider(
-            self.fr_driving, "Speed: ", exec=self.execute, action=ACTION.SPEED, from_=-100, to=100, orient=VERTICAL)
+            self.fr_driving, "Speed: ", exec=self.execute, action=ACTIONS.SPEED, from_=-100, to=100, orient=VERTICAL)
         self.slider_speed.pack(side=LEFT, expand=True, padx=5, pady=5)
         self.slider_steering = Slider(self.fr_driving, "Steering: ", exec=self.execute,
-                                      action=ACTION.STEERING, from_=-100, to=100, orient=HORIZONTAL)
+                                      action=ACTIONS.STEERING, from_=-100, to=100, orient=HORIZONTAL)
         self.slider_steering.pack(side=LEFT, expand=True, padx=5, pady=5)
 
         self.fr_action_btn = LabelFrame(self.fr_btn, text="Action Buttons")
@@ -90,9 +90,9 @@ class Window(tk.Tk):
     def bind_keys(self):
         self.bind("<Escape>", self.close)
 
-    def execute(self, action, msg="", ret=RETURN.ACK):
+    def execute(self, action, msg="", ack=True):
         if self.client is not None:
-            msg = self.client.exec(action=action, msg=msg, ret_type=ret)
+            msg = self.client.exec(action=action, msg=msg, ack=ack)
 
     def sync(self):
         sync_dir(self.client, all=True)
@@ -147,8 +147,7 @@ class Window(tk.Tk):
     def update_livestream(self):
         if self.client is not None:
             width = self.fr_info.winfo_width()
-            msg = self.client.exec(
-                ACTION.LIVESTREAM, ret_type=RETURN.JPG, decode=False, log=False)
+            msg = self.client.exec(ACTIONS.LIVESTREAM)
             jpeg = np.frombuffer(msg, dtype=np.uint8)
             frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
             img = Image.fromarray(frame)
@@ -168,13 +167,21 @@ class Window(tk.Tk):
 
     def config_add_clicked(self):
         name, data = add_btn(self, action_btn=False, new=True)
-        print(name, data)
         self.config_btns[name] = data
-        print(self.config_btns)
         self.update_config_btn()
-        print("oki")
         self.save_data()
 
     def close(self, *_):
         self.active = False
         self.destroy()
+
+    def update_data(self):
+        self.update_livestream()
+
+    def mainloop(self):
+        time_between = 1 / self.fps
+        while self.active:
+            start = time.time()
+            self.update_data()
+            self.update()
+            time.sleep(max(0, (time_between - (time.time() - start))))
