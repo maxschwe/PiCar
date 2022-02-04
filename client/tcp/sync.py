@@ -12,11 +12,12 @@ def sync_dir(client, all=False):
     else:
         last_sync = 0
     synced_count = 0
-    for root, dirs, files in os.walk(Config.PATH_PC):
+    path_src = Config.PATH_PC if Config.USE_PC else Config.PATH_LAPTOP
+    for root, dirs, files in os.walk(path_src):
         for file in files:
             filepath = os.path.join(root, file)
             last_modified = os.path.getmtime(filepath)
-            new_filepath = filepath.replace(Config.PATH_PC, Config.PATH_PI)
+            new_filepath = filepath.replace(path_src, Config.PATH_PI)
             new_filepath = new_filepath.replace("\\", "/")
             if last_modified > last_sync or all:
                 client.put(filepath, new_filepath)

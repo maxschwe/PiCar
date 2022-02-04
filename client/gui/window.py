@@ -9,28 +9,37 @@ from threading import Thread
 import json
 import traceback
 import time
+import ctypes
+from functools import partial
+import keyboard
 
 from .slider import Slider
 from .buttons import ActionButton, ConfigButton
 from .add_btn import add_btn
-from ..tcp import sync_dir, ACTIONS
+from tcp import sync_dir, ACTIONS
 
 
 class Window(tk.Tk):
     def __init__(self, client, width=1000, height=600, fps=30):
         super().__init__()
+        self.tk.call("source", "gui/Sun-Valley-ttk-theme/sun-valley.tcl")
+        self.tk.call("set_theme", "dark")
+
         self.fps = fps
         x = int(self.winfo_screenwidth()/2 - width/2)
         y = max(0, int(self.winfo_screenheight()/2 - height/2 - 40))
-        y = 0
+        # y = 0
         self.geometry(f"{width}x{height}+{x}+{y}")
         self.title("PiCar Controller")
 
-        self.tk.call("source", "src/gui/Sun-Valley-ttk-theme/sun-valley.tcl")
-        self.tk.call("set_theme", "dark")
-
         self.client = client
         self.active = True
+        self.movements = []
+        self.old_speed = 0
+        self.old_steering = 0
+        self.keys_pressed = {}
+        self.keys_debouncer = {}
+        self.i = 0
 
         self.load_data()
         self.widgets()
@@ -90,9 +99,10 @@ class Window(tk.Tk):
     def bind_keys(self):
         self.bind("<Escape>", self.close)
 
-    def execute(self, action, msg="", ack=True):
+    def execute(self, action, params="", ack=True):
         if self.client is not None:
-            msg = self.client.exec(action=action, msg=msg, ack=ack)
+            msg = self.client.exec(
+                action=action, params=params, ack=ack, log=True)
 
     def sync(self):
         sync_dir(self.client, all=True)
@@ -122,8 +132,9 @@ class Window(tk.Tk):
     def update_action_btn(self):
         index = 0
         for btn_text, params in self.action_btns.items():
+            action = ACTIONS.decode(params["action"])
             btn = ActionButton(self.fr_action_btn, text=btn_text,
-                               exec=self.execute, action=params["action"], msg=params["msg"], ret=params["ret"])
+                               exec=self.execute, action=action, msg=params["msg"], ret=params["ret"])
             btn.grid(row=index // 2, column=index %
                      2, sticky=EW, padx=5, pady=3)
             index += 1
@@ -135,8 +146,9 @@ class Window(tk.Tk):
     def update_config_btn(self):
         index = 0
         for btn_text, params in self.config_btns.items():
+            action = ACTIONS.decode(params["action"])
             btn = ConfigButton(self.fr_config_btn, text=btn_text, active=params["active"],
-                               exec=self.execute, action=params["action"], ret=params["ret"])
+                               exec=self.execute, action=action, ret=params["ret"])
             btn.grid(row=index // 2, column=index %
                      2, sticky=EW, padx=5, pady=3)
             index += 1
@@ -147,7 +159,7 @@ class Window(tk.Tk):
     def update_livestream(self):
         if self.client is not None:
             width = self.fr_info.winfo_width()
-            msg = self.client.exec(ACTIONS.LIVESTREAM)
+            _, msg = self.client.exec(ACTIONS.LIVESTREAM)
             jpeg = np.frombuffer(msg, dtype=np.uint8)
             frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
             img = Image.fromarray(frame)
@@ -158,6 +170,24 @@ class Window(tk.Tk):
             imgtk = ImageTk.PhotoImage(image=resized_img)
             self.livestream.imgtk = imgtk
             self.livestream.configure(image=imgtk)
+
+    def update_move(self):
+        new_speed = 0
+        new_steering = 0
+        if keyboard.is_pressed("Up"):
+            new_speed = 40
+        elif keyboard.is_pressed("Down"):
+            new_speed = -40
+        if keyboard.is_pressed("Right"):
+            new_steering = 100
+        elif keyboard.is_pressed("Left"):
+            new_steering = -100
+        if new_speed != self.old_speed:
+            self.execute(ACTIONS.SPEED, params=new_speed)
+        if new_steering != self.old_steering:
+            self.execute(ACTIONS.STEERING, params=new_steering)
+        self.old_speed = new_speed
+        self.old_steering = new_steering
 
     def action_add_clicked(self):
         name, data = add_btn(self, action_btn=True, new=True)
@@ -177,11 +207,16 @@ class Window(tk.Tk):
 
     def update_data(self):
         self.update_livestream()
+        self.i += 1
+        if self.i == 3:
+            self.update_move()
+            self.i = 0
 
     def mainloop(self):
         time_between = 1 / self.fps
         while self.active:
             start = time.time()
             self.update_data()
+            self.movements = []
             self.update()
             time.sleep(max(0, (time_between - (time.time() - start))))

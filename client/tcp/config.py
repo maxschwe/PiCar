@@ -6,7 +6,7 @@ class Config:
     # ==================================================================
     # SERVER configuration
     # ==================================================================
-    SERVER = "127.0.0.1"  # SERVER = "192.168.178.75"
+    SERVER = "192.168.178.75"  # SERVER = "127.0.0.1"
     PORT = 4000, 10
 
     DELAY_RECONNECTING = 3
@@ -19,6 +19,9 @@ class Config:
     # ==================================================================
     # Sync configuration
     # ==================================================================
-    PATH_PC = "C:/Users/Max/Desktop/Daten/Python/PiCar/pi"
+    USE_PC = True
+    PATH_PC = "/home/max/Schreibtisch/Python/PiCar/pi"
+    PATH_LAPTOP = "C:/Users/Max/Desktop/Daten/Python/PiCar/pi"
+
     PATH_DATA = "data"
-    PATH_PI = "C:/Users/Max/Desktop/Test"  # /home/pi/PiCar
+    PATH_PI = "/home/pi/PiCar"  # "C:/Users/Max/Desktop/Test"

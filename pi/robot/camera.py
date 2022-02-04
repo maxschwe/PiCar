@@ -6,9 +6,12 @@ from imutils.video.pivideostream import PiVideoStream
 
 class Camera(object):
     def __init__(self, flip=False):
+        print("hi")
         self.vs = PiVideoStream().start()
+
         self.flip = flip
         time.sleep(2.0)
+        print("Started Camera")
 
     def _flip_if_needed(self, frame):
         if self.flip:

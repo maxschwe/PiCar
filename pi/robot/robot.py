@@ -10,15 +10,15 @@ MOTOR_CONTROL_VECTOR = {"forward": [GPIO.HIGH, GPIO.LOW, GPIO.HIGH, GPIO.LOW],
                         "stop": 4 * [GPIO.LOW]}
 
 
-class InstanceBuffer:
-    instance = 0
-
-
 class Robot:
+    _instance = 0
+
     def __init__(self):
+        print("ok")
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
-        self.mov_type = "Stop"
+        self.mov_type = "stop"
+        self.manual = False
         self.camera = Camera()
         self.servo = Servo(Config.servo, init_pos=90)
 
@@ -37,14 +37,14 @@ class Robot:
     def set_speed(self, speed):
         if speed == 0:
             self.speed = 0
-            self.mov_type = 'Stop'
+            self.mov_type = 'stop'
         else:
-            self.mov_type = 'Backward' if speed < 0 else 'Forward'
+            self.mov_type = 'backward' if speed < 0 else 'forward'
             self.speed = round(self._map_between(
                 abs(speed), 0, 100, Config.MIN_SPEED, 100), 2)
 
         for pin, val in zip(Config.MOTOR_CONTROL, MOTOR_CONTROL_VECTOR[self.mov_type]):
-            GPIO.out(pin, val)
+            GPIO.output(pin, val)
 
         self.m_left.ChangeDutyCycle(self.speed)
         self.m_right.ChangeDutyCycle(self.speed)
@@ -70,8 +70,9 @@ class Robot:
             return None
         return min_out + (val - min_in) / (max_in - min_in) * (max_out - min_out)
 
-    @ staticmethod
-    def instance():
-        if InstanceBuffer.instance == 0:
-            InstanceBuffer.instance = Robot()
-        return InstanceBuffer.instance
+    @classmethod
+    def instance(cls):
+        if cls._instance == 0:
+            cls._instance = cls()
+            print("oh man")
+        return cls._instance

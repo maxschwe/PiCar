@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import traceback
+import time
 
 from .config import Config
 from .actions import ACTIONS
@@ -53,6 +54,9 @@ class TcpServer:
     def restart(self, socket):
         socket.disconnect()
         self.stop_server()
+        from robot.robot import Robot
+        r = Robot.instance().camera.vs.stop()
+        time.sleep(2)
         logging.info("[Server is shutting down and will be restarted]")
         print(5 * "...\n")
 

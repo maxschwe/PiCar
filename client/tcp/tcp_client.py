@@ -67,6 +67,8 @@ class TcpClient:
             params = params[0]
         if log:
             self.log(f"{action}: {params}", type="recv")
+        if action == ACTIONS.ERROR:
+            self.log(f"{params}", type="error")
         return action, params, flags
 
     def recv_header(self):
@@ -107,6 +109,7 @@ class TcpClient:
 
             # convert msg to byte and evtl. encode
             if type(msg) != bytes:
+                msg = str(msg)
                 if flags["json"]:
                     msg = json.dumps(msg)
                 msg = msg.encode(encoding=Config.ENCODING)
@@ -221,5 +224,7 @@ class TcpClient:
             logging.info(f"[{msg}]")
         elif type == "div":
             logging.info(60*"-")
+        elif type == "error":
+            logging.error("!!!{msg}!!!")
         else:
             logging.error("Wrong type log")

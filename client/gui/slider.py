@@ -90,7 +90,7 @@ class Slider(LabelFrame):
         # send if value changed
         if self.last_val != val:
             self.last_val = val
-            self.exec(action=self.action, msg=val)
+            self.exec(action=self.action, params=val)
 
     def reset(self):
         self.val.set(self.initial_val)

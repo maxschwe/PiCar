@@ -2,7 +2,7 @@ from tkinter.ttk import *
 from tkinter import Toplevel
 from tkinter.constants import *
 
-from ..tcp import ACTIONS
+from tcp import ACTIONS
 
 
 def add_btn(master, action_btn, new, **kwargs):

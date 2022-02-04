@@ -24,6 +24,6 @@ client.load_status()
 """action, params = client.exec(
         ACTIONS.ECHO, ["Hallo ich bin der Max", {"wie geht es dir": 20}], log=True)"""
 
-# sync_dir(client, all=True)
+sync_dir(client, all=False)
 
 client.disconnect()
