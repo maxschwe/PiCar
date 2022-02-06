@@ -56,6 +56,9 @@ class TcpClient:
         return wrapper
 
     def exec_no_timeout_handling(self, action, params="", log=False, **kwargs):
+
+        if log:
+            self.log(type="div")
         sent_flags = self.send(
             action=action, params=params, log=log, **kwargs)
 
@@ -66,7 +69,6 @@ class TcpClient:
             # send back ack if expected
             if flags["ack"]:
                 self.send(ACTIONS.ACK, log=log, ack=False)
-
             if action == ACTIONS.ACK:
                 return True
 
@@ -206,7 +208,6 @@ class TcpClient:
         for file, error in params.items():
             if error is not None:
                 print(f">>> {file}: \n{error}")
-        self.log(type="div")
 
     def ping(self):
         start = time.time()
@@ -253,6 +254,7 @@ class TcpClient:
 
         return synced_count
 
+    @_check_connection
     def disconnect(self, action=ACTIONS.DISCONNECT):
         ack = self.exec_no_timeout_handling(action=action)
         if type(ack) != bool:
@@ -283,22 +285,29 @@ class TcpClient:
         return Thread(target=func, daemon=True)
 
     def log(self, msg="", type="txt"):
+        type_binding = "txt"
         if type == "txt":
-            logging.info(f">>> {msg}")
+            txt = f">>> {msg}"
         elif type == "recv":
-            logging.info(f"Rx: {msg}")
+            txt = f"Rx: {msg}"
         elif type == "sent":
-            logging.info(f"Tx: {msg}")
+            txt = f"Tx: {msg}"
         elif type == "server":
-            logging.info(f"[{msg}]")
+            txt = f"[{msg}]"
         elif type == "div":
-            logging.info(60*"-")
+            txt = 60*"-"
         elif type == "error":
-            logging.error(f"!!!{msg}!!!")
+            txt = f"!!!{msg}!!!"
+            type_binding = "error"
         else:
-            logging.error("Wrong type log")
+            txt = "Wrong log type"
+            type_binding = "error"
+        if type == "error":
+            logging.error(txt)
+        else:
+            logging.info(txt)
         for log_binding in self.log_bindings:
-            log_binding(msg)
+            log_binding(msg=txt, type=type)
 
     def bind_log(self, func):
         self.log_bindings.append(func)

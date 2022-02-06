@@ -8,13 +8,12 @@ import logging
 class Camera(object):
     def __init__(self, flip=False):
         try:
-            self.vs = PiVideoStream()
+            self.vs = PiVideoStream(resolution=(320, 240))
             self.vs.start()
         except:
             logging.error("Failed to start camera")
 
         self.flip = flip
-        time.sleep(2.0)
 
     def _flip_if_needed(self, frame):
         if self.flip:

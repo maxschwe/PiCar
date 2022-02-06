@@ -19,6 +19,9 @@ from .buttons import ActionButton, ConfigButton
 from .add_btn import add_btn
 from tcp import ACTIONS
 
+FONT_INFO_LBL = ("Helvetica", 20)
+SPEED = 40
+
 
 class Window(tk.Tk):
     def __init__(self, client, width=1000, height=600, fps=30):
@@ -36,6 +39,7 @@ class Window(tk.Tk):
         self.client = client
         self.client.bind_log(self.log)
         self.connected = False
+        self.new_outputs = []
 
         self.old_speed = 0
         self.old_steering = 0
@@ -60,12 +64,14 @@ class Window(tk.Tk):
 
         self.fr_driving = Frame(self.fr_btn)
         self.fr_driving.pack(fill=X, expand=True)
+        self.fr_driving.columnconfigure(0, weight=1, uniform='fred')
+        self.fr_driving.columnconfigure(1, weight=1, uniform='fred')
         self.slider_speed = Slider(
             self.fr_driving, "Speed: ", exec=self.execute, action=ACTIONS.SPEED, from_=-100, to=100, orient=VERTICAL)
-        self.slider_speed.pack(side=LEFT, expand=True, padx=10, pady=10)
+        self.slider_speed.grid(row=0, column=0, padx=10, pady=10)
         self.slider_steering = Slider(self.fr_driving, "Steering: ", exec=self.execute,
                                       action=ACTIONS.STEERING, from_=-100, to=100, orient=HORIZONTAL)
-        self.slider_steering.pack(side=LEFT, expand=True, padx=10, pady=10)
+        self.slider_steering.grid(row=0, column=1, padx=10, pady=10)
 
         self.fr_action_btn = LabelFrame(self.fr_btn, text="Action Buttons")
         self.fr_action_btn.pack(fill=X, padx=30, pady=30, ipady=3)
@@ -94,6 +100,8 @@ class Window(tk.Tk):
 
         self.livestream = Label(self.fr_info)
         self.livestream.pack()
+        self.lbl_fps = Label(self.fr_info, text="",
+                             font=FONT_INFO_LBL, padding=(10, 10))
 
         self.action_add_btn = Button(
             self.fr_action_btn, text="+", style="Accent.TButton", command=self.action_add_clicked)
@@ -101,6 +109,46 @@ class Window(tk.Tk):
         self.config_add_btn = Button(
             self.fr_config_btn, text="+", style="Accent.TButton", command=self.config_add_clicked)
         self.config_btns = [self.config_add_btn]
+
+        self.fr_terminal_output = Frame(self.fr_terminal)
+        self.fr_terminal_output.pack(
+            side=TOP, expand=YES, fill=BOTH, padx=10, pady=10)
+        self.terminal_output = tk.Text(
+            self.fr_terminal_output)
+
+        ys = Scrollbar(self.fr_terminal_output, orient='vertical',
+                       command=self.terminal_output.yview)
+        xs = Scrollbar(self.fr_terminal_output, orient='horizontal',
+                       command=self.terminal_output.xview)
+        self.terminal_output['yscrollcommand'] = ys.set
+        self.terminal_output['xscrollcommand'] = xs.set
+
+        self.terminal_output.grid(
+            column=0, row=0, sticky='nwes')
+        xs.grid(column=0, row=1, sticky='we')
+        ys.grid(column=1, row=0, sticky='ns')
+        self.fr_terminal_output.grid_columnconfigure(0, weight=1)
+        self.fr_terminal_output.grid_rowconfigure(0, weight=1)
+
+        self.fr_exec = Frame(self.fr_terminal)
+        self.fr_exec.pack(padx=30, pady=30)
+        self.fr_exec.columnconfigure(0, weight=1, uniform='fred')
+        self.fr_exec.columnconfigure(1, weight=1, uniform='fred')
+
+        self.cb_action = Combobox(
+            self.fr_exec, values=ACTIONS.list(), state="readonly")
+        self.cb_action.grid(row=0, column=0, padx=10, pady=10)
+        self.cb_action.current(0)
+
+        self.txt_params = Entry(self.fr_exec)
+        self.txt_params.grid(row=0, column=1, padx=10, pady=10)
+
+        self.btn_exec = Button(
+            self.fr_exec, text="▶", style="Accent.TButton", command=self.btn_exec_clicked)
+        self.btn_exec.grid(row=0, column=2, padx=10, pady=10)
+
+    def btn_exec_clicked(self):
+        pass
 
     def bind_keys(self):
         self.bind("<Escape>", self.close)
@@ -134,6 +182,7 @@ class Window(tk.Tk):
 
     def sync(self):
         self.client.sync_dir(all=True)
+        self.log("Synced files")
 
     def sync_restart(self):
         self.sync()
@@ -198,9 +247,9 @@ class Window(tk.Tk):
         new_speed = 0
         new_steering = 0
         if keyboard.is_pressed("Up"):
-            new_speed = 40
+            new_speed = SPEED
         elif keyboard.is_pressed("Down"):
-            new_speed = -40
+            new_speed = -1 * SPEED
         if keyboard.is_pressed("Right"):
             new_steering = 100
         elif keyboard.is_pressed("Left"):
@@ -231,13 +280,18 @@ class Window(tk.Tk):
     def update_data(self):
         self.update_livestream()
         self.i += 1
-        if self.i == 3:
+        if self.i % 3 == 0:
             self.update_move()
+
+        if self.i == 20:
+            self.lbl_fps["text"] = str(self.fps) + " fps"
+            self.lbl_fps.place(relx=0, rely=0)
             self.i = 0
 
     def mainloop(self):
         self.active = True
         time_between = 1 / self.fps
+
         try:
             while self.active:
                 start = time.time()
@@ -247,11 +301,19 @@ class Window(tk.Tk):
                 if self.connected:
                     self.connected = self.client.connected
                     self.update_data()
+                outputs = self.new_outputs.copy()
+                for new_output in outputs:
+                    self.terminal_output.config(state=NORMAL)
+                    self.terminal_output.insert(END, new_output + "\n")
+                    self.terminal_output.see("end")
+                    self.terminal_output.config(state=DISABLED)
+                    self.new_outputs.remove(new_output)
+
                 self.update()
-                time.sleep(max(0, (time_between - (time.time() - start))))
+                self.fps = int(1 / (time.time() - start))
+                # time.sleep(max(0, (time_between - (time.time() - start))))
         except tk.TclError:
             pass
 
-    def log(self, msg):
-        pass
-        # print(msg)
+    def log(self, msg, type="txt"):
+        self.new_outputs += msg.split('\n')
