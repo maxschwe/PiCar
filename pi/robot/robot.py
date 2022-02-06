@@ -3,6 +3,7 @@ from .servo import Servo
 from .robot_config import Config
 import RPi.GPIO as GPIO
 import time
+from threading import Thread
 
 
 MOTOR_CONTROL_VECTOR = {"forward": [GPIO.HIGH, GPIO.LOW, GPIO.HIGH, GPIO.LOW],
@@ -14,7 +15,6 @@ class Robot:
     _instance = 0
 
     def __init__(self):
-        print("ok")
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         self.mov_type = "stop"
@@ -31,9 +31,18 @@ class Robot:
         self.set_speed(0)
         self.set_steering(0)
 
+    def _thread(func):
+        def wrapper(self, *args, **kwargs):
+            args = [self, *args]
+            t = Thread(target=func, daemon=True, args=args, kwargs=kwargs)
+            t.start()
+            return t
+        return wrapper
+
     def get_liveimg(self):
         return self.camera.get_frame()
 
+    @_thread
     def set_speed(self, speed):
         if speed == 0:
             self.speed = 0
@@ -49,6 +58,7 @@ class Robot:
         self.m_left.ChangeDutyCycle(self.speed)
         self.m_right.ChangeDutyCycle(self.speed)
 
+    @_thread
     def set_steering(self, steering):
         self.steering = self._map_between(
             steering, -100, 100, Config.SERVO_MIN, Config.SERVO_MAX)
@@ -74,5 +84,4 @@ class Robot:
     def instance(cls):
         if cls._instance == 0:
             cls._instance = cls()
-            print("oh man")
         return cls._instance

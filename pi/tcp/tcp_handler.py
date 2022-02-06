@@ -5,14 +5,16 @@ import json
 import traceback
 import time
 import os
+import socket
 
 from .config import Config
 from .actions import ACTIONS
 
 
-# JSON, decode and more_to_recv are generated and dont need to be specified
-FLAGS = ["", "", "", "", "json", "decode", "ack", "more_to_recv"]
+# JSON, int, float, decode and more_to_recv are generated and dont need to be specified
+FLAGS = ["", "bool", "float", "int", "json", "decode", "ack", "more_to_recv"]
 DEFAULT_FLAG_VALUES = [False, False, False, False, False, True, False, False]
+ACTIONS_NO_LOG = [ACTIONS.LIVESTREAM]
 
 
 class TcpHandler(Thread):
@@ -31,15 +33,18 @@ class TcpHandler(Thread):
         self.connected = True
 
     def run(self):
-        while self.connected:
-            self.sent_response = False
-            # accept request
-            action, params, flags = self.receive()
+        try:
+            while self.connected:
+                self.sent_response = False
+                # accept request
+                action, params, flags = self.receive(log=True)
 
-            # handle request
-            self.handle_action(action, params, flags)
+                # handle request
+                self.handle_action(action, params, flags)
+        except:
+            self.log(f"Client {self.addr} disconnected!", type="server")
 
-    def receive(self):
+    def receive(self, log=False):
         more_to_recv = True
         params = []
         while more_to_recv:
@@ -53,6 +58,8 @@ class TcpHandler(Thread):
             more_to_recv = flags["more_to_recv"]
         if len(params) == 1:
             params = params[0]
+        if log and action not in ACTIONS_NO_LOG:
+            self.log(f"{action}: {params}", type="recv")
         return action, params, flags
 
     def recv_header(self):
@@ -80,15 +87,19 @@ class TcpHandler(Thread):
             recv_text = recv_text.decode(Config.ENCODING)
         if flags["json"]:
             recv_text = json.loads(recv_text)
+        elif flags["int"]:
+            recv_text = int(recv_text)
+        elif flags["float"]:
+            recv_text = float(recv_text)
+        elif flags["bool"]:
+            recv_text = bool(int(recv_text))
         return recv_text
 
     def received_ack(self):
-        action, _, _ = self.recv_header()
-        if action == ACTIONS.ACK:
-            return True
-        return False
+        action, _, _ = self.receive()
+        return action == ACTIONS.ACK
 
-    def send(self, action, params="", **flags):
+    def send(self, action, params="", log=True, **flags):
         if type(params) != list:
             params = [params]
         params_count = len(params)
@@ -96,11 +107,17 @@ class TcpHandler(Thread):
             flags["more_to_recv"] = params_count - 1 != i
             flags["json"] = type(msg) == dict
             flags["decode"] = type(msg) != bytes
+            flags["int"] = type(msg) == int
+            flags["float"] = type(msg) == float
+            flags["bool"] = type(msg) == bool
 
             # convert msg to string and convert to bytes
             if type(msg) != bytes:
                 if flags["json"]:
                     msg = json.dumps(msg)
+                elif flags["bool"]:
+                    msg = int(msg)
+                msg = str(msg)
                 msg = msg.encode(encoding=Config.ENCODING)
             # calculate msg length
             msg_length = len(msg)
@@ -111,6 +128,8 @@ class TcpHandler(Thread):
             # send msg
             if msg_length > 0:
                 self.send_msg(msg, msg_length, sent_flags)
+        if log and action not in ACTIONS_NO_LOG:
+            self.log(f"{action}: {params}", type="sent")
         self.sent_response = True
         # wait for ack if expected
         if sent_flags["ack"]:
@@ -228,9 +247,12 @@ class TcpHandler(Thread):
             f.write(params[1])
         logging.info(f"Created file: {file_path}")
 
-    def disconnect(self):
+    def disconnect(self, send_ack=True):
         # send ack and disconnect
-        self.send_ack()
-        self.connected = False
-        self.socket.close()
-        self.log(f"Client {self.addr} disconnected!", type="server")
+        if self.connected:
+            if send_ack:
+                self.send_ack()
+            self.socket.close()
+            self.connected = False
+
+            self.log(f"Client {self.addr} disconnected!", type="server")

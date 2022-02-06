@@ -52,10 +52,10 @@ class TcpServer:
         self.server.detach()
 
     def restart(self, socket):
-        socket.disconnect()
+        socket.disconnect(send_ack=True)
         self.stop_server()
         from robot.robot import Robot
-        r = Robot.instance().camera.vs.stop()
+        Robot.instance().camera.vs.stop()
         time.sleep(2)
         logging.info("[Server is shutting down and will be restarted]")
         print(5 * "...\n")

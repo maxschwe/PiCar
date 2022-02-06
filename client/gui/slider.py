@@ -17,7 +17,7 @@ class Slider(LabelFrame):
         super().__init__(master)
 
         self.fr_main = Frame(self)
-        self.fr_main.pack(padx=10, pady=10)
+        self.fr_main.pack(padx=30, pady=30)
         self.fr_input = Frame(self.fr_main)
         self.lbl = Label(self.fr_input, text=label)
 

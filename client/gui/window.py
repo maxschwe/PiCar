@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 from PIL import ImageTk, Image
 from threading import Thread
+import socket
 
 import json
 import traceback
@@ -16,7 +17,7 @@ import keyboard
 from .slider import Slider
 from .buttons import ActionButton, ConfigButton
 from .add_btn import add_btn
-from tcp import sync_dir, ACTIONS
+from tcp import ACTIONS
 
 
 class Window(tk.Tk):
@@ -33,16 +34,17 @@ class Window(tk.Tk):
         self.title("PiCar Controller")
 
         self.client = client
-        self.active = True
-        self.movements = []
+        self.client.bind_log(self.log)
+        self.connected = False
+
         self.old_speed = 0
         self.old_steering = 0
-        self.keys_pressed = {}
-        self.keys_debouncer = {}
         self.i = 0
 
-        self.load_data()
         self.widgets()
+        self.load_data()
+        self.update_action_btn()
+        self.update_config_btn()
         self.bind_keys()
         self.update()
 
@@ -60,25 +62,25 @@ class Window(tk.Tk):
         self.fr_driving.pack(fill=X, expand=True)
         self.slider_speed = Slider(
             self.fr_driving, "Speed: ", exec=self.execute, action=ACTIONS.SPEED, from_=-100, to=100, orient=VERTICAL)
-        self.slider_speed.pack(side=LEFT, expand=True, padx=5, pady=5)
+        self.slider_speed.pack(side=LEFT, expand=True, padx=10, pady=10)
         self.slider_steering = Slider(self.fr_driving, "Steering: ", exec=self.execute,
                                       action=ACTIONS.STEERING, from_=-100, to=100, orient=HORIZONTAL)
-        self.slider_steering.pack(side=LEFT, expand=True, padx=5, pady=5)
+        self.slider_steering.pack(side=LEFT, expand=True, padx=10, pady=10)
 
         self.fr_action_btn = LabelFrame(self.fr_btn, text="Action Buttons")
-        self.fr_action_btn.pack(fill=X, padx=10, pady=10, ipady=3)
+        self.fr_action_btn.pack(fill=X, padx=30, pady=30, ipady=3)
         self.fr_action_btn.columnconfigure(0, weight=1, uniform='fred')
         self.fr_action_btn.columnconfigure(1, weight=1, uniform='fred')
 
         self.fr_config_btn = LabelFrame(
             self.fr_btn, text="Config Buttons")
-        self.fr_config_btn.pack(fill=X, padx=10, pady=10, ipady=3)
+        self.fr_config_btn.pack(fill=X, padx=30, pady=30, ipady=3)
         self.fr_config_btn.columnconfigure(0, weight=1, uniform='fred')
         self.fr_config_btn.columnconfigure(1, weight=1, uniform='fred')
 
         self.fr_sync_btn = LabelFrame(
             self.fr_btn, text="Sync")
-        self.fr_sync_btn.pack(fill=X, padx=10, pady=10, ipady=3)
+        self.fr_sync_btn.pack(fill=X, padx=30, pady=30, ipady=3)
         self.fr_sync_btn.columnconfigure(0, weight=1, uniform='fred')
         self.fr_sync_btn.columnconfigure(1, weight=1, uniform='fred')
 
@@ -93,19 +95,45 @@ class Window(tk.Tk):
         self.livestream = Label(self.fr_info)
         self.livestream.pack()
 
-        self.update_action_btn()
-        self.update_config_btn()
+        self.action_add_btn = Button(
+            self.fr_action_btn, text="+", style="Accent.TButton", command=self.action_add_clicked)
+        self.action_btns = [self.action_add_btn]
+        self.config_add_btn = Button(
+            self.fr_config_btn, text="+", style="Accent.TButton", command=self.config_add_clicked)
+        self.config_btns = [self.config_add_btn]
 
     def bind_keys(self):
         self.bind("<Escape>", self.close)
 
-    def execute(self, action, params="", ack=True):
-        if self.client is not None:
-            msg = self.client.exec(
-                action=action, params=params, ack=ack, log=True)
+    def on_connect(self):
+        synced_count = self.client.sync_dir(all=False)
+        if synced_count > 0:
+            self.client.exec_restart()
+            return
+        self.client.ping()
+        self.client.load_status()
+        self.slider_speed.reset()
+        self.slider_steering.reset()
+
+        for config_btn in self.config_btns[:-1]:
+            config_btn.exec()
+
+    def execute(self, action, params="", log=True, ack=True):
+        if self.client.connected:
+            try:
+                resp = self.client.exec(
+                    action=action, params=params, ack=ack, log=log)
+                # received bool for ack
+                if type(resp) != tuple:
+                    return resp
+                action, params = resp
+                if action != ACTIONS.ERROR:
+                    return action, params
+            except socket.timeout:
+                self.log("Client is not connected!")
 
     def sync(self):
-        sync_dir(self.client, all=True)
+        self.client.sync_dir(all=True)
 
     def sync_restart(self):
         self.sync()
@@ -115,61 +143,56 @@ class Window(tk.Tk):
         try:
             with open("data/gui.json") as f:
                 data = json.load(f)
-            self.action_btns = data["action_btns"]
-            self.config_btns = data["config_btns"]
+            action_btns_data = data["action_btns"]
+            config_btns_data = data["config_btns"]
         except:
             traceback.print_exc()
-            self.action_btns = {}
-            self.config_btns = {}
+            action_btns_data = {}
+            config_btns_data = {}
+        for name, params in action_btns_data.items():
+            action = ACTIONS.decode(params["action"])
+            btn = ActionButton(self.fr_action_btn, text=name,
+                               exec=self.execute, action=action, msg=params["msg"], ret=params["ret"])
+            self.action_btns.insert(len(self.config_btns)-1, btn)
+        for name, params in config_btns_data.items():
+            action = ACTIONS.decode(params["action"])
+            btn = ConfigButton(self.fr_config_btn, text=name, active=params["active"],
+                               exec=self.execute, action=action, ret=params["ret"])
+            self.config_btns.insert(len(self.config_btns)-1, btn)
 
     def save_data(self):
         data = {"action_btns": self.action_btns,
                 "config_btns": self.config_btns}
-        print(data)
         with open("data/gui.json", "w") as f:
             json.dump(data, f, indent=4)
 
     def update_action_btn(self):
-        index = 0
-        for btn_text, params in self.action_btns.items():
-            action = ACTIONS.decode(params["action"])
-            btn = ActionButton(self.fr_action_btn, text=btn_text,
-                               exec=self.execute, action=action, msg=params["msg"], ret=params["ret"])
-            btn.grid(row=index // 2, column=index %
-                     2, sticky=EW, padx=5, pady=3)
-            index += 1
-        self.action_add = Button(
-            self.fr_action_btn, text="+", style="Accent.TButton", command=self.action_add_clicked)
-        self.action_add.grid(row=index // 2,
-                             column=index % 2, padx=3, pady=3)
+        self.update_btns(self.action_btns)
 
     def update_config_btn(self):
-        index = 0
-        for btn_text, params in self.config_btns.items():
-            action = ACTIONS.decode(params["action"])
-            btn = ConfigButton(self.fr_config_btn, text=btn_text, active=params["active"],
-                               exec=self.execute, action=action, ret=params["ret"])
+        self.update_btns(self.config_btns)
+
+    def update_btns(self, list):
+        for index, btn in enumerate(list):
             btn.grid(row=index // 2, column=index %
                      2, sticky=EW, padx=5, pady=3)
-            index += 1
-        self.config_add = Button(
-            self.fr_config_btn, text="+", style="Accent.TButton", command=self.config_add_clicked)
-        self.config_add.grid(row=index // 2, column=index % 2, padx=3, pady=3)
 
     def update_livestream(self):
-        if self.client is not None:
-            width = self.fr_info.winfo_width()
-            _, msg = self.client.exec(ACTIONS.LIVESTREAM)
-            jpeg = np.frombuffer(msg, dtype=np.uint8)
-            frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
-            img = Image.fromarray(frame)
-            factor = width / img.width
-            resized_img = img.resize(
-                (int(width), int(img.height * factor)), Image.ANTIALIAS)
+        width = self.fr_info.winfo_width()
+        resp = self.execute(ACTIONS.LIVESTREAM, log=False)
+        if resp is None:
+            return
+        action, msg = resp
+        jpeg = np.frombuffer(msg, dtype=np.uint8)
+        frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
+        img = Image.fromarray(frame)
+        factor = width / img.width
+        resized_img = img.resize(
+            (int(width), int(img.height * factor)), Image.ANTIALIAS)
 
-            imgtk = ImageTk.PhotoImage(image=resized_img)
-            self.livestream.imgtk = imgtk
-            self.livestream.configure(image=imgtk)
+        imgtk = ImageTk.PhotoImage(image=resized_img)
+        self.livestream.imgtk = imgtk
+        self.livestream.configure(image=imgtk)
 
     def update_move(self):
         new_speed = 0
@@ -213,10 +236,22 @@ class Window(tk.Tk):
             self.i = 0
 
     def mainloop(self):
+        self.active = True
         time_between = 1 / self.fps
-        while self.active:
-            start = time.time()
-            self.update_data()
-            self.movements = []
-            self.update()
-            time.sleep(max(0, (time_between - (time.time() - start))))
+        try:
+            while self.active:
+                start = time.time()
+                if not self.connected and self.client.connected:
+                    self.connected = True
+                    self.on_connect()
+                if self.connected:
+                    self.connected = self.client.connected
+                    self.update_data()
+                self.update()
+                time.sleep(max(0, (time_between - (time.time() - start))))
+        except tk.TclError:
+            pass
+
+    def log(self, msg):
+        pass
+        # print(msg)

@@ -12,12 +12,12 @@ class ActionButton(Button):
         super().__init__(master, command=self.on_click, *args, **kwargs)
 
     def on_click(self):
-        self.exec(action=self.action, msg=self.msg)
+        self.exec(action=self.action, params=self.msg)
 
 
 class ConfigButton(Checkbutton):
     def __init__(self, master, active, exec, action, ret, *args, **kwargs):
-        self.exec = exec
+        self._exec = exec
         self.action = action
         self.ret = ret
         self.active = active
@@ -25,10 +25,9 @@ class ConfigButton(Checkbutton):
         super().__init__(master, command=self.on_click,
                          style="Toggle.TButton", variable=var, *args, **kwargs)
 
-        self.exec(action=self.action,
-                  params=1 if self.active else 0)
-
     def on_click(self):
         self.active = not self.active
-        self.exec(action=self.action,
-                  params=1 if self.active else 0)
+        self.exec()
+
+    def exec(self):
+        self._exec(action=self.action, params=self.active)
