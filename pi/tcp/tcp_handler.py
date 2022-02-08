@@ -28,7 +28,7 @@ class TcpHandler(Thread):
             ACTIONS.PING: self.ping_response,
             ACTIONS.PUT: self.put,
             ACTIONS.ECHO: self.echo,
-            ACTIONS.HI: self.hi
+            ACTIONS.HI: self.hi,
         }
         self.connected = True
 

@@ -21,6 +21,7 @@ from tcp import ACTIONS
 
 FONT_INFO_LBL = ("Helvetica", 20)
 SPEED = 40
+PARAM_DELIMETER = ";"
 
 
 class Window(tk.Tk):
@@ -84,19 +85,27 @@ class Window(tk.Tk):
         self.fr_config_btn.columnconfigure(0, weight=1, uniform='fred')
         self.fr_config_btn.columnconfigure(1, weight=1, uniform='fred')
 
-        self.fr_sync_btn = LabelFrame(
-            self.fr_btn, text="Sync")
-        self.fr_sync_btn.pack(fill=X, padx=30, pady=30, ipady=3)
-        self.fr_sync_btn.columnconfigure(0, weight=1, uniform='fred')
-        self.fr_sync_btn.columnconfigure(1, weight=1, uniform='fred')
+        self.fr_connection_btn = LabelFrame(
+            self.fr_btn, text="Connection")
+        self.fr_connection_btn.pack(fill=X, padx=30, pady=30, ipady=3)
+        self.fr_connection_btn.columnconfigure(0, weight=1, uniform='fred')
+        self.fr_connection_btn.columnconfigure(1, weight=1, uniform='fred')
+
+        self.btn_connect = Button(
+            self.fr_connection_btn, text="Connect", command=self.connect, style="Accent.TButton")
+        self.btn_connect.grid(row=0, column=0, sticky=EW, padx=5, pady=3)
+
+        self.btn_ping = Button(
+            self.fr_connection_btn, text="Ping", command=self.ping)
+        self.btn_ping.grid(row=0, column=1, sticky=EW, padx=5, pady=3)
 
         self.btn_sync = Button(
-            self.fr_sync_btn, text="Sync", command=self.sync)
-        self.btn_sync.grid(row=0, column=0, sticky=EW, padx=5, pady=3)
+            self.fr_connection_btn, text="Sync", command=self.sync)
+        self.btn_sync.grid(row=1, column=0, sticky=EW, padx=5, pady=3)
 
         self.btn_sync_restart = Button(
-            self.fr_sync_btn, text="Sync and Restart", command=self.sync_restart, style="Accent.TButton")
-        self.btn_sync_restart.grid(row=0, column=1, sticky=EW, padx=5, pady=3)
+            self.fr_connection_btn, text="Sync + Restart", command=self.sync_restart, style="Accent.TButton")
+        self.btn_sync_restart.grid(row=1, column=1, sticky=EW, padx=5, pady=3)
 
         self.livestream = Label(self.fr_info)
         self.livestream.pack()
@@ -147,8 +156,50 @@ class Window(tk.Tk):
             self.fr_exec, text="▶", style="Accent.TButton", command=self.btn_exec_clicked)
         self.btn_exec.grid(row=0, column=2, padx=10, pady=10)
 
+    def connect(self):
+        self.client.try_connect().start()
+
+    def ping(self):
+        self.client.ping()
+
     def btn_exec_clicked(self):
-        pass
+        action = ACTIONS.decode(self.cb_action.current())
+        params = self.txt_params.get()
+
+        params = self._format_params(params)
+
+        self.execute(action, params)
+
+    def _format_params(self, params):
+        params = params.split(PARAM_DELIMETER)
+        if params != [""]:
+            for i in range(len(params)):
+                param = params[i]
+                if len(param) > 0 and param[0] in ["'", '"']:
+                    param = param[1:]
+                    if param.endswith("'") or param.endswith('"'):
+                        param = param[:-1]
+
+                else:
+                    param = param.lstrip()
+                    if len(param) > 0 and param[0] in ["{"]:
+                        try:
+                            param = json.loads(param)
+                        except:
+                            self.log("!!!Json data wrong specified!!!")
+                    else:
+                        param = param.replace(" ", "")
+                        try:
+                            param = int(param)
+                        except ValueError:
+                            try:
+                                param = float(param)
+                            except ValueError:
+                                param = param == "True"
+                params[i] = param
+        else:
+            params = ""
+        return params
 
     def bind_keys(self):
         self.bind("<Escape>", self.close)
@@ -182,7 +233,6 @@ class Window(tk.Tk):
 
     def sync(self):
         self.client.sync_dir(all=True)
-        self.log("Synced files")
 
     def sync_restart(self):
         self.sync()
@@ -210,8 +260,8 @@ class Window(tk.Tk):
             self.config_btns.insert(len(self.config_btns)-1, btn)
 
     def save_data(self):
-        data = {"action_btns": self.action_btns,
-                "config_btns": self.config_btns}
+        data = {"action_btns": [btn.get_data() for btn in self.action_btns],
+                "config_btns": [btn.get_data() for btn in self.action_btns]}
         with open("data/gui.json", "w") as f:
             json.dump(data, f, indent=4)
 
@@ -263,6 +313,7 @@ class Window(tk.Tk):
 
     def action_add_clicked(self):
         name, data = add_btn(self, action_btn=True, new=True)
+        data["msg"] = self._format_params(data["msg"])
         self.action_btns[name] = data
         self.update_action_btn()
         self.save_data()
@@ -310,7 +361,7 @@ class Window(tk.Tk):
                     self.new_outputs.remove(new_output)
 
                 self.update()
-                self.fps = int(1 / (time.time() - start))
+                self.fps = int(1 / max(0.00001, time.time() - start))
                 # time.sleep(max(0, (time_between - (time.time() - start))))
         except tk.TclError:
             pass

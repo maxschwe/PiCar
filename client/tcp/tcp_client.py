@@ -19,6 +19,7 @@ DEFAULT_FLAG_VALUES = [False, False, False, False, False, True, True, False]
 class TcpClient:
     def __init__(self):
         self.connected = False
+        self.trying_to_connect = False
         self.log_bindings = []
 
     def connect(self):
@@ -247,6 +248,9 @@ class TcpClient:
                 if last_modified > last_sync or all:
                     self.put(filepath, new_filepath)
                     synced_count += 1
+        if synced_count > 0:
+            self.log(type="div")
+            self.log("Synced files", type="server")
 
         os.makedirs(Config.PATH_DATA, exist_ok=True)
         with open(last_sync_path, "w") as f:
@@ -272,15 +276,18 @@ class TcpClient:
 
     def try_connect(self):
         def func():
-            start_time = time.time()
-            while (time.time() - start_time) < Config.TIMEOUT_RECONNECTING:
-                if self.connect():
-                    break
-                time.sleep(Config.DELAY_RETRY_CONNECTING)
-            if not self.connected:
-                logging.error(
-                    f"[Failed to reconnect within {Config.TIMEOUT_RECONNECTING}s]")
-            return self.connected
+            if not self.trying_to_connect:
+                self.trying_to_connect = True
+                start_time = time.time()
+                while (time.time() - start_time) < Config.TIMEOUT_RECONNECTING:
+                    if self.connect():
+                        break
+                    time.sleep(Config.DELAY_RETRY_CONNECTING)
+                if not self.connected:
+                    self.log(
+                        f"[Failed to reconnect within {Config.TIMEOUT_RECONNECTING}s]", type="error")
+                self.trying_to_connect = False
+                return self.connected
 
         return Thread(target=func, daemon=True)
 

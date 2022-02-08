@@ -3,6 +3,7 @@ from tkinter import Toplevel
 from tkinter.constants import *
 
 from tcp import ACTIONS
+import time
 
 
 def add_btn(master, action_btn, new, **kwargs):
@@ -32,39 +33,31 @@ def add_btn(master, action_btn, new, **kwargs):
     action = Combobox(fr_config, values=ACTIONS.list(), state="readonly")
     action.grid(row=1, column=1, padx=10)
 
-    lbl_msg = Label(fr_config, text="Message:")
+    lbl_msg = Label(fr_config, text="Params:")
     lbl_msg.grid(row=0, column=2)
 
     msg = Entry(fr_config)
     msg.grid(row=1, column=2, padx=10)
 
-    lbl_ret = Label(fr_config, text="Return Type:")
-    lbl_ret.grid(row=0, column=3)
-
-    ret = Combobox(fr_config, values=ACTIONS.list(), state="readonly")
-    ret.grid(row=1, column=3, padx=10)
-
     if not action_btn:
         lbl_active = Label(fr_config, text="Active:")
-        lbl_active.grid(row=0, column=4)
+        lbl_active.grid(row=0, column=3)
 
         active = Checkbutton(fr_config)
-        active.grid(row=1, column=4, padx=10)
+        active.grid(row=1, column=3, padx=10)
 
     if not new:
         action.current(ACTIONS.list().index(kwargs["action"]))
         msg.delete(0, "end")
         msg.insert(0, kwargs["msg"])
-        ret.current(RETURN.list().index(kwargs["ret"]))
         if not action_btn:
             act = kwargs["active"]
-            if act == 0:
-                active.state(['!alternate'])
-            elif act == 1:
+            if act:
                 active.state(["selected"])
+            else:
+                active.state(['!alternate'])
     else:
         action.current(0)
-        ret.current(0)
         if not action_btn:
             active.state(["!alternate"])
 
@@ -78,8 +71,9 @@ def add_btn(master, action_btn, new, **kwargs):
     win.grab_set()
     while not btn_clicked:
         win.update()
+        time.sleep(0.001)
 
-    data = {"action": action.current(), "msg": msg.get(), "ret": ret.current()}
+    data = {"action": action.current(), "msg": msg.get()}
 
     if not action_btn:
         active = 0 if active.state() == () else 1

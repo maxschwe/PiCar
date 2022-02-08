@@ -19,7 +19,7 @@ def setup_logging():
 
 setup_logging()
 client = TcpClient()
-win = Window(client, width=3000, height=1500)
+win = Window(client, width=1500, height=900)
 client.try_connect().start()
 
 win.mainloop()

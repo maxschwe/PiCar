@@ -16,7 +16,7 @@
             "action": 4,
             "msg": "",
             "ret": 0,
-            "active": 1
+            "active": true
         }
     }
 }

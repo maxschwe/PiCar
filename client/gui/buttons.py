@@ -30,4 +30,4 @@ class ConfigButton(Checkbutton):
         self.exec()
 
     def exec(self):
-        self._exec(action=self.action, params=self.active)
+        self._exec(action=self.action, params=[self.active])
