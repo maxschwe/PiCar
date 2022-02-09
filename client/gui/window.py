@@ -175,27 +175,27 @@ class Window(tk.Tk):
         if params != [""]:
             for i in range(len(params)):
                 param = params[i]
+                param = param.lstrip().rstrip()
                 if len(param) > 0 and param[0] in ["'", '"']:
                     param = param[1:]
                     if param.endswith("'") or param.endswith('"'):
                         param = param[:-1]
 
+                elif len(param) > 0 and param[0] in ["{"]:
+                    try:
+                        param = json.loads(param)
+                    except:
+                        traceback.print_exc()
+                        self.log("!!!Json data wrong specified!!!")
                 else:
-                    param = param.lstrip()
-                    if len(param) > 0 and param[0] in ["{"]:
+                    param = param.replace(" ", "")
+                    try:
+                        param = int(param)
+                    except ValueError:
                         try:
-                            param = json.loads(param)
-                        except:
-                            self.log("!!!Json data wrong specified!!!")
-                    else:
-                        param = param.replace(" ", "")
-                        try:
-                            param = int(param)
+                            param = float(param)
                         except ValueError:
-                            try:
-                                param = float(param)
-                            except ValueError:
-                                param = param == "True"
+                            param = param == "True"
                 params[i] = param
         else:
             params = ""
@@ -248,20 +248,30 @@ class Window(tk.Tk):
             traceback.print_exc()
             action_btns_data = {}
             config_btns_data = {}
-        for name, params in action_btns_data.items():
-            action = ACTIONS.decode(params["action"])
-            btn = ActionButton(self.fr_action_btn, text=name,
-                               exec=self.execute, action=action, msg=params["msg"], ret=params["ret"])
-            self.action_btns.insert(len(self.config_btns)-1, btn)
-        for name, params in config_btns_data.items():
-            action = ACTIONS.decode(params["action"])
-            btn = ConfigButton(self.fr_config_btn, text=name, active=params["active"],
-                               exec=self.execute, action=action, ret=params["ret"])
-            self.config_btns.insert(len(self.config_btns)-1, btn)
+        for params in action_btns_data:
+            self.add_action_btn(params)
+
+        for params in config_btns_data:
+            self.add_config_btn(params)
+
+    def add_action_btn(self, params):
+        action = ACTIONS.decode(params["action"])
+        index = len(self.action_btns) - 1
+        btn = ActionButton(self.fr_action_btn, name=params["name"],
+                           exec=self.execute, action=action, params=params["params"], edit=self.edit_action_btn)
+        self.action_btns.insert(index, btn)
+
+    def add_config_btn(self, params):
+        action = ACTIONS.decode(params["action"])
+        index = len(self.config_btns)-1
+        btn = ConfigButton(self.fr_config_btn, name=params["name"], active=params["active"],
+                           exec=self.execute, action=action, edit=self.edit_config_btn)
+        btn.exec()
+        self.config_btns.insert(index, btn)
 
     def save_data(self):
-        data = {"action_btns": [btn.get_data() for btn in self.action_btns],
-                "config_btns": [btn.get_data() for btn in self.action_btns]}
+        data = {"action_btns": [btn.get_data(decoded=True) for btn in self.action_btns[:-1]],
+                "config_btns": [btn.get_data(decoded=True) for btn in self.config_btns[:-1]]}
         with open("data/gui.json", "w") as f:
             json.dump(data, f, indent=4)
 
@@ -273,6 +283,7 @@ class Window(tk.Tk):
 
     def update_btns(self, list):
         for index, btn in enumerate(list):
+            btn.index = index
             btn.grid(row=index // 2, column=index %
                      2, sticky=EW, padx=5, pady=3)
 
@@ -281,7 +292,7 @@ class Window(tk.Tk):
         resp = self.execute(ACTIONS.LIVESTREAM, log=False)
         if resp is None:
             return
-        action, msg = resp
+        _, msg = resp
         jpeg = np.frombuffer(msg, dtype=np.uint8)
         frame = cv2.imdecode(jpeg, cv2.IMREAD_COLOR)
         img = Image.fromarray(frame)
@@ -312,15 +323,49 @@ class Window(tk.Tk):
         self.old_steering = new_steering
 
     def action_add_clicked(self):
-        name, data = add_btn(self, action_btn=True, new=True)
-        data["msg"] = self._format_params(data["msg"])
-        self.action_btns[name] = data
+        data = add_btn(self, action_btn=True, new=True)
+        data["params"] = self._format_params(data["params"])
+        self.add_action_btn(data)
+        self.update_action_btn()
+        self.save_data()
+
+    def edit_action_btn(self, index):
+        rel_btn = self.action_btns[index]
+        prev_data = rel_btn.get_data()
+        prev_data["params"] = ";".join(
+            map(lambda x: f'"{x}"' if type(x) == str else str(x).replace("'", '"'), prev_data["params"]))
+        data = add_btn(self, action_btn=True, new=False, **prev_data)
+        if data is None:
+            return
+        elif data == "remove":
+            removed_btn = self.action_btns.pop(index)
+            removed_btn.grid_remove()
+        else:
+            data["params"] = self._format_params(data["params"])
+            rel_btn.edit_data(**data)
         self.update_action_btn()
         self.save_data()
 
     def config_add_clicked(self):
-        name, data = add_btn(self, action_btn=False, new=True)
-        self.config_btns[name] = data
+        data = add_btn(self, action_btn=False, new=True)
+        self.add_config_btn(data)
+        self.update_config_btn()
+        self.save_data()
+
+    def edit_config_btn(self, index):
+        rel_btn = self.config_btns[index]
+        prev_data = rel_btn.get_data()
+        data = add_btn(self, action_btn=False, new=False, **prev_data)
+        if data is None:
+            return
+        elif data == "remove":
+            if rel_btn.active:
+                rel_btn.active = False
+                rel_btn.exec()
+            removed_btn = self.config_btns.pop(index)
+            removed_btn.grid_remove()
+        else:
+            self.config_btns[index].edit_data(**data)
         self.update_config_btn()
         self.save_data()
 

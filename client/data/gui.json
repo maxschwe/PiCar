@@ -1,22 +1,12 @@
 {
-    "action_btns": {
-        "Ping": {
-            "action": 0,
-            "msg": "",
-            "ret": 6
-        },
-        "a": {
-            "action": 0,
-            "msg": "",
-            "ret": 0
+    "action_btns": [
+        {
+            "name": "Speed Reset",
+            "action": 8,
+            "params": [
+                0
+            ]
         }
-    },
-    "config_btns": {
-        "moinmoin": {
-            "action": 4,
-            "msg": "",
-            "ret": 0,
-            "active": true
-        }
-    }
+    ],
+    "config_btns": []
 }

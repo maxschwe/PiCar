@@ -8,10 +8,16 @@ import time
 
 def add_btn(master, action_btn, new, **kwargs):
     btn_clicked = False
+    remove = False
 
     def on_btn_clicked():
         nonlocal btn_clicked
         btn_clicked = True
+
+    def on_remove_clicked():
+        nonlocal btn_clicked, remove
+        btn_clicked = True
+        remove = True
 
     win = Toplevel(master)
 
@@ -32,14 +38,14 @@ def add_btn(master, action_btn, new, **kwargs):
 
     action = Combobox(fr_config, values=ACTIONS.list(), state="readonly")
     action.grid(row=1, column=1, padx=10)
+    if action_btn:
+        lbl_msg = Label(fr_config, text="Params:")
+        lbl_msg.grid(row=0, column=2)
 
-    lbl_msg = Label(fr_config, text="Params:")
-    lbl_msg.grid(row=0, column=2)
+        msg = Entry(fr_config)
+        msg.grid(row=1, column=2, padx=10)
 
-    msg = Entry(fr_config)
-    msg.grid(row=1, column=2, padx=10)
-
-    if not action_btn:
+    else:
         lbl_active = Label(fr_config, text="Active:")
         lbl_active.grid(row=0, column=3)
 
@@ -47,12 +53,14 @@ def add_btn(master, action_btn, new, **kwargs):
         active.grid(row=1, column=3, padx=10)
 
     if not new:
+        name.delete(0, "end")
+        name.insert(0, kwargs["name"])
         action.current(ACTIONS.list().index(kwargs["action"]))
-        msg.delete(0, "end")
-        msg.insert(0, kwargs["msg"])
-        if not action_btn:
-            act = kwargs["active"]
-            if act:
+        if action_btn:
+            msg.delete(0, "end")
+            msg.insert(0, kwargs["params"])
+        else:
+            if kwargs["active"]:
                 active.state(["selected"])
             else:
                 active.state(['!alternate'])
@@ -64,20 +72,28 @@ def add_btn(master, action_btn, new, **kwargs):
     btn = Button(win, command=on_btn_clicked,
                  style="Accent.TButton", text=btn_txt)
     btn.pack(side=RIGHT, padx=30, pady=20)
+    if not new:
+        btn = Button(win, command=on_remove_clicked,
+                     style="Accent.TButton", text="Delete")
+        btn.pack(side=RIGHT, padx=30, pady=20)
     win.update_idletasks()
     x = int(master.winfo_screenwidth()/2 - win.winfo_width()/2)
     y = max(0, int(master.winfo_screenheight()/2 - win.winfo_height()/2 - 40))
     win.geometry(f"+{x}+{y}")
     win.grab_set()
-    while not btn_clicked:
+    while (not btn_clicked) and 'normal' == win.state():
         win.update()
         time.sleep(0.001)
-
-    data = {"action": action.current(), "msg": msg.get()}
-
+    if not btn_clicked:
+        return
+    if remove:
+        win.destroy()
+        return "remove"
+    data = {"name": name.get(), "action": ACTIONS.decode(action.current())}
+    if action_btn:
+        data["params"] = msg.get()
     if not action_btn:
-        active = 0 if active.state() == () else 1
+        active = active.state() != ()
         data["active"] = active
-    name = name.get()
     win.destroy()
-    return name, data
+    return data
